@@ -54,7 +54,10 @@ class Client:
                 close_reason = e.reason
                 if close_code == 1008:
                     self.is_policy_violation = True
+                    logger.error("\n\n")
+                    logger.error("----- Policy Violation -----")
                     logger.error(f"Policy violation: {close_reason}")
+                    logger.error("----- Policy Violation -----\n\n")
                 logger.info("WebSocket connection closed")
                 self.connected = False
                 break
