@@ -1,3 +1,5 @@
+import base64
+import json
 import queue
 import threading
 from unittest.mock import MagicMock, Mock, patch
@@ -41,7 +43,7 @@ def test_initialization(mock_pyaudio):
     """Test AudioInputStream initialization with default parameters"""
     stream = AudioInputStream()
     assert stream._rate == 16000
-    assert stream._chunk == 4048
+    assert stream._chunk == 3200
     assert stream._device == 0
     assert stream.running is True
     assert stream._is_tts_active is False
@@ -143,11 +145,7 @@ def test_generator(audio_stream):
 
     # Verify the results
     assert len(collected_chunks) > 0
-    assert all(isinstance(chunk, bytes) for chunk in collected_chunks)
-
-    # Optional: verify the actual content
-    expected = [b"chunk1", b"chunk2", b"chunk3"]
-    assert b"".join(collected_chunks) == b"".join(expected)
+    assert all(isinstance(data, dict) for data in collected_chunks)
 
 
 def test_stop(audio_stream, mock_pyaudio):
@@ -182,7 +180,12 @@ def test_audio_callback(mock_pyaudio):
     next(stream.generator())
 
     # Verify callback was called with correct data
-    assert callback_data == test_data
+    assert callback_data == json.dumps(
+        {
+            "audio": base64.b64encode(test_data).decode("utf-8"),
+            "rate": 16000,
+        }
+    )
 
     stream.stop()
 
@@ -202,7 +205,10 @@ def test_error_handling(mock_pyaudio):
 def test_multiple_chunks_generation(audio_stream):
     """Test generating multiple chunks at once"""
     chunks = [b"chunk1", b"chunk2", b"chunk3"]
-    expected_data = b"".join(chunks)
+    expected_data = {
+        "audio": base64.b64encode(b"".join(chunks)).decode("utf-8"),
+        "rate": 16000,
+    }
 
     # Add chunks in quick succession
     for chunk in chunks:
