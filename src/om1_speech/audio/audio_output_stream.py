@@ -2,6 +2,8 @@ import argparse
 import base64
 import json
 import logging
+import shutil
+import subprocess
 import threading
 from queue import Empty, Queue
 from typing import Callable, Dict, Optional
@@ -58,14 +60,11 @@ class AudioOutputStream:
         # Callback for TTS state
         self._tts_state_callback = tts_state_callback
 
-        # Audio interface
-        self.stream: Optional[pyaudio.Stream] = None
-
         # Pending requests queue
         self._pending_requests: Queue[Optional[str]] = Queue()
 
         # Initialize audio interface
-        self._audio_interface = pyaudio.PyAudio()
+        self._pyaudio_interface = pyaudio.PyAudio()
 
         self.running: bool = True
 
@@ -76,11 +75,11 @@ class AudioOutputStream:
         # Find a suitable output device
         try:
             output_device = None
-            device_count = self._audio_interface.get_device_count()
+            device_count = self._pyaudio_interface.get_device_count()
             logger.info(f"Found {device_count} audio devices")
 
             if self._device is not None:
-                device_info = self._audio_interface.get_device_info_by_index(
+                device_info = self._pyaudio_interface.get_device_info_by_index(
                     self._device
                 )
                 logger.info(
@@ -93,7 +92,7 @@ class AudioOutputStream:
             elif self._device_name is not None:
                 available_devices = []
                 for i in range(device_count):
-                    device_info = self._audio_interface.get_device_info_by_index(i)
+                    device_info = self._pyaudio_interface.get_device_info_by_index(i)
                     if device_info["maxOutputChannels"] > 0:
                         device_name = device_info["name"]
                         available_devices.append({"name": device_name, "index": i})
@@ -106,43 +105,29 @@ class AudioOutputStream:
                         f"No output device found with name {self._device_name}. Available devices: {available_devices}"
                     )
             else:
-                for i in range(device_count):
-                    device_info = self._audio_interface.get_device_info_by_index(i)
-                    logger.info(f"Device {i}: {device_info['name']}")
-                    logger.info(
-                        f"Max Output Channels: {device_info['maxOutputChannels']}"
+                default_device_index = (
+                    self._pyaudio_interface.get_default_output_device_info()["index"]
+                )
+                output_device = self._pyaudio_interface.get_device_info_by_index(
+                    default_device_index
+                )
+                self._device = default_device_index
+                logger.info(
+                    f"Using default output device: {output_device['name']} ({self._device})"
+                )
+
+                # Verify the device has output channels
+                if output_device["maxOutputChannels"] == 0:
+                    raise ValueError(
+                        f"Default output device {output_device['name']} has no output channels"
                     )
-
-                    if device_info["maxOutputChannels"] > 0:
-                        output_device = device_info
-                        self._device = i
-                        break
-
-                if output_device is None:
-                    raise ValueError("No output device found")
 
             logger.info(
                 f"Selected output device: {output_device['name']} at index {self._device}"
             )
-
-            self.stream = self._audio_interface.open(
-                output_device_index=self._device,
-                format=pyaudio.paInt16,
-                channels=min(
-                    2, output_device["maxOutputChannels"]
-                ),  # Use up to 2 channels
-                rate=self._rate,
-                output=True,
-                frames_per_buffer=1024,
-            )
-            logger.info("Successfully opened audio stream")
-
         except Exception as e:
             logger.error(f"Error setting up audio: {e}")
-            if self.stream:
-                self.stream.close()
-            self.stream = None
-            raise
+            raise ValueError("Error setting up audio")
 
     def set_tts_state_callback(self, callback: Callable):
         """
@@ -185,7 +170,7 @@ class AudioOutputStream:
                 logger.info(f"Received TTS response: {response.status_code}")
                 if response.status_code == 200:
                     result = response.json()
-                    if "response" in result and self.stream:
+                    if "response" in result:
                         audio_data = result["response"]
                         self._write_audio(audio_data)
                         logger.debug(f"Processed TTS request: {tts_request}")
@@ -208,16 +193,42 @@ class AudioOutputStream:
         audio_data : bytes
             The audio data to be written to the output stream
         """
-        if self.stream:
-            audio_bytes = base64.b64decode(audio_data)
+        audio_bytes = base64.b64decode(audio_data)
 
-            self._tts_callback(True)
+        if not is_installed("ffplay"):
+            message = (
+                "ffplay from ffmpeg not found, necessary to play audio. "
+                "On mac you can install it with 'brew install ffmpeg'. "
+                "On linux and windows you can install it from https://ffmpeg.org/"
+            )
+            logger.error(message)
+            return
 
-            self.stream.write(audio_bytes)
+        self._tts_callback(True)
 
-            self.stream.stop_stream()
-            self._tts_callback(False)
-            self.stream.start_stream()
+        args = [
+            "ffplay",
+            "-autoexit",
+            "-",
+            "-nodisp",
+            # It is not good at supporting audio_device_index from pyaudio
+            # Reading the list from ffplay doesn't work either
+            # "-audio_device_index",
+            # str(self._device),
+        ]
+        proc = subprocess.Popen(
+            args=args,
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.communicate(input=audio_bytes)
+        exit_code = proc.poll()
+
+        if exit_code != 0:
+            logger.error(f"Error playing audio: {exit_code}")
+
+        self._tts_callback(False)
 
     def _tts_callback(self, is_active: bool):
         """
@@ -267,6 +278,13 @@ class AudioOutputStream:
         Stop the audio output stream and cleanup resources.
         """
         self.running = False
+
+
+def is_installed(lib_name: str) -> bool:
+    lib = shutil.which(lib_name)
+    if lib is None:
+        return False
+    return True
 
 
 def main():
