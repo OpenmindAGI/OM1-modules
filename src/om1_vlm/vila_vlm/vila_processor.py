@@ -124,6 +124,10 @@ class VILAProcessor:
                         "prompt": "What is the most interesting aspect in this series of images?",
                     }
 
+                    # Add explicit CUDA synchronization before processing
+                    if torch.cuda.is_available():
+                        torch.cuda.synchronize()
+
                     self.response = self.generate_with_images(
                         message["images"], message["prompt"]
                     )
