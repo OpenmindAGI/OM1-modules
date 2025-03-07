@@ -87,7 +87,9 @@ class AudioInputStream:
                     f"Selected input device: {input_device['name']} ({self._device})"
                 )
                 if input_device["maxInputChannels"] == 0:
-                    logger.warn(f"Selected input device does not advertize input channels: {input_device['name']} ({self._device})")
+                    logger.warn(
+                        f"Selected input device does not advertize input channels: {input_device['name']} ({self._device})"
+                    )
             elif self._device_name is not None:
                 available_devices = []
                 for i in range(device_count):
