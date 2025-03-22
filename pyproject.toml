@@ -36,13 +36,13 @@ build-backend = "poetry.core.masonry.api"
 [tool.black]
 line-length = 88
 include = '\.pyi?$'
-exclude = "/src/om1_vlm/gz/msgs"
+exclude = "(.venv)|(/src/om1_vlm/gz/msgs)"
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
 line_length = 88
-skip_glob = ["/src/om1_vlm/gz/msgs"]
+skip_glob = [".venv*", "/src/om1_vlm/gz/msgs"]
 
 [tool.ruff]
 line-length = 88
