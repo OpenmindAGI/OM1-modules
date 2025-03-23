@@ -34,12 +34,16 @@ class GazeboVideoStream:
     fps : Optional[int], optional
         Frames per second to capture.
         By default 30
+    topic : Optional[str], optional
+        Gazebo topic to obtain simulated camera feed.
+        By default /camera
     """
 
     def __init__(
         self,
         frame_callback: Optional[Callable[[str], None]] = None,
         fps: Optional[int] = 30,
+        topic: Optional[str] = "/camera"
     ):
         self._video_thread: Optional[threading.Thread] = None
 
@@ -48,6 +52,7 @@ class GazeboVideoStream:
 
         # Video capture device
         self._cap = None
+        self.capture_topic = topic
 
         self.running: bool = True
 
@@ -142,7 +147,7 @@ class GazeboVideoStream:
         """
         try:
             result = subprocess.run(
-                ["gz", "topic", "-e", "-t", "/camera", "-n", "1"],
+                ["gz", "topic", "-e", "-t", self.capture_topic, "-n", "1"],
                 capture_output=True,
                 text=True,
                 timeout=5,  # Avoid indefinite hangs
