@@ -43,7 +43,7 @@ class GazeboVideoStream:
         self,
         frame_callback: Optional[Callable[[str], None]] = None,
         fps: Optional[int] = 30,
-        topic: Optional[str] = "/camera"
+        topic: Optional[str] = "/camera",
     ):
         self._video_thread: Optional[threading.Thread] = None
 
