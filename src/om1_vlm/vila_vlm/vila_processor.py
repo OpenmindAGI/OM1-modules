@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 import time
 from io import BytesIO
 from typing import Any, Callable, List, Optional
@@ -73,6 +74,13 @@ class VILAProcessor:
         self.response = ""
         self.running = True
 
+        # Add locks for thread safety
+        self.model_lock = threading.Lock()
+        self.buffer_lock = threading.Lock()
+
+        # Create a dedicated CUDA stream for this processor
+        self.cuda_stream = torch.cuda.Stream() if torch.cuda.is_available() else None
+
         try:
             self.model_config = GenerationConfig(
                 max_new_tokens=48,
@@ -99,9 +107,10 @@ class VILAProcessor:
             Annotated video frame
         """
         # Make sure image buffer always gets the latest image but stays the same size
-        if len(self.image_buffer) == self.model_args.vila_batch_size:
-            self.image_buffer.pop(0)
-        self.image_buffer.append(image)
+        with self.buffer_lock:
+            if len(self.image_buffer) == self.model_args.vila_batch_size:
+                self.image_buffer.pop(0)
+            self.image_buffer.append(image)
 
     def process_frames(self, video_output: Any, video_source: Any):
         """
@@ -117,25 +126,34 @@ class VILAProcessor:
         while self.running:
             # Send accumulated images to VILA server
             try:
-                if len(self.image_buffer) == self.model_args.vila_batch_size:
-                    logger.info(f"Processing {len(self.image_buffer)} images")
-                    message = {
-                        "images": self.image_buffer,
-                        "prompt": "What is the most interesting aspect in this series of images?",
-                    }
+                # Create a safe copy of the image buffer
+                with self.buffer_lock:
+                    # Only process if we have enough images
+                    if len(self.image_buffer) < self.model_args.vila_batch_size:
+                        # Not enough images yet, sleep briefly and continue
+                        time.sleep(0.01)
+                        continue
 
-                    # Add explicit CUDA synchronization before processing
-                    if torch.cuda.is_available():
-                        torch.cuda.synchronize()
+                    # Create a copy of the buffer to process
+                    images_to_process = self.image_buffer.copy()
 
-                    self.response = self.generate_with_images(
-                        message["images"], message["prompt"]
-                    )
+                logger.info(f"Processing {len(images_to_process)} images")
+                message = {
+                    "images": images_to_process,
+                    "prompt": "What is the most interesting aspect in this series of images?",
+                }
 
-                    if self.callback:
-                        self.callback(json.dumps({"vlm_reply": self.response}))
+                # Process the images with proper synchronization
+                self.response = self.generate_with_images(
+                    message["images"], message["prompt"]
+                )
+
+                if self.callback:
+                    self.callback(json.dumps({"vlm_reply": self.response}))
             except Exception as e:
-                logger.error(f"Error sending frames to VILA server: {e}")
+                logger.error(f"Error processing frames: {e}")
+                # Sleep briefly to avoid tight loop on error
+                time.sleep(0.1)
 
     def generate_with_images(self, images: List[bytes], prompt: str):
         temp_files = []
@@ -168,9 +186,29 @@ class VILAProcessor:
             # Add text prompt
             prompt_list.append(prompt)
 
-            # Generate response using shared model
-            with torch.inference_mode():
-                response = self.model.generate_content(prompt_list, self.model_config)
+            # Generate response using shared model with proper synchronization
+            with self.model_lock:
+                # Set the current CUDA stream
+                if self.cuda_stream:
+                    with torch.cuda.stream(self.cuda_stream):
+                        # Add explicit CUDA synchronization before processing
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+
+                        with torch.inference_mode():
+                            response = self.model.generate_content(
+                                prompt_list, self.model_config
+                            )
+
+                        # Synchronize again after processing
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                else:
+                    with torch.inference_mode():
+                        response = self.model.generate_content(
+                            prompt_list, self.model_config
+                        )
+
             end = time.time() * 1000
             logger.debug(f"Time taken to infer: {end - start} ms")
 
@@ -188,3 +226,14 @@ class VILAProcessor:
         Sets the running flag to False to terminate processing loop.
         """
         self.running = False
+
+        # Ensure CUDA resources are properly cleaned up
+        if torch.cuda.is_available():
+            try:
+                # Wait for all CUDA operations to complete
+                torch.cuda.synchronize()
+
+                # Clean up CUDA cache
+                torch.cuda.empty_cache()
+            except Exception as e:
+                logger.error(f"Error cleaning up CUDA resources: {e}")
