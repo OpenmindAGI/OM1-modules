@@ -1,8 +1,6 @@
 import logging
 import threading
 
-import torch
-
 from om1_utils import singleton
 
 from .model_loader import VILAModelLoader
@@ -13,9 +11,6 @@ try:
     import llava
     from llava import conversation as clib
     from llava.media import Image, Video
-
-    # PreTrainedModel doesn't work on Mac M chips
-    from transformers import GenerationConfig
 except ModuleNotFoundError:
     llava = None
     clib = None
@@ -48,21 +43,22 @@ class VILAModelSingleton:
 
     def _warmup_model(self, model_args):
         """Warmup the model with a simple query"""
-        try:
-            model_config = GenerationConfig(
-                max_new_tokens=48,
-                temperature=0.7,
-                top_p=0.95,
-                do_sample=True,
-            )
-            with torch.inference_mode():
-                self._model.generate_content(
-                    ["What is 1 plus 1?"],
-                    model_config,
-                )
-        except Exception as e:
-            logger.error(f"Model warmup failed: {e}")
-            raise
+        # disable warmup for now to avoid the concurrency issue
+        # try:
+        #     model_config = GenerationConfig(
+        #         max_new_tokens=48,
+        #         temperature=0.7,
+        #         top_p=0.95,
+        #         do_sample=True,
+        #     )
+        #     with torch.inference_mode():
+        #         self._model.generate_content(
+        #             ["What is 1 plus 1?"],
+        #             model_config,
+        #         )
+        # except Exception as e:
+        #     logger.error(f"Model warmup failed: {e}")
+        #     raise
 
     @property
     def model(self):

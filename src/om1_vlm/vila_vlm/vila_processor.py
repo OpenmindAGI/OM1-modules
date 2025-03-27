@@ -107,10 +107,9 @@ class VILAProcessor:
             Annotated video frame
         """
         # Make sure image buffer always gets the latest image but stays the same size
-        with self.buffer_lock:
-            if len(self.image_buffer) == self.model_args.vila_batch_size:
-                self.image_buffer.pop(0)
-            self.image_buffer.append(image)
+        if len(self.image_buffer) == self.model_args.vila_batch_size:
+            self.image_buffer.pop(0)
+        self.image_buffer.append(image)
 
     def process_frames(self, video_output: Any, video_source: Any):
         """
