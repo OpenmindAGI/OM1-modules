@@ -184,6 +184,7 @@ def test_audio_callback(mock_pyaudio):
         {
             "audio": base64.b64encode(test_data).decode("utf-8"),
             "rate": 16000,
+            "language_code": "en-US",
         }
     )
 
@@ -208,6 +209,7 @@ def test_multiple_chunks_generation(audio_stream):
     expected_data = {
         "audio": base64.b64encode(b"".join(chunks)).decode("utf-8"),
         "rate": 16000,
+        "language_code": "en-US",
     }
 
     # Add chunks in quick succession

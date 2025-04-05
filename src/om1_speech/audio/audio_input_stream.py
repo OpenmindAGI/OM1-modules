@@ -51,13 +51,20 @@ class AudioInputStream:
         device: Optional[Union[str, int, float, Any]] = None,
         device_name: str = None,
         audio_data_callback: Optional[Callable] = None,
-        language_code: str = "en-US",
+        language_code: Optional[str] = None,
     ):
         self._rate = rate
         self._chunk = chunk
         self._device = device
         self._device_name = device_name
-        self._language_code = language_code
+
+        # Determine language code
+        if language_code is None:
+            self._language_code = "en-US"
+            logger.info(f"Using default language code: {self._language_code}")
+        else:
+            self._language_code = language_code
+            logger.info(f"Using specified language code: {self._language_code}")
 
         # Callback for audio data
         self.audio_data_callback = audio_data_callback
