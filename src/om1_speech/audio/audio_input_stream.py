@@ -295,7 +295,7 @@ class AudioInputStream:
             response = {
                 "audio": base64.b64encode(b"".join(data)).decode("utf-8"),
                 "rate": self._rate,
-                "language": self._language_code,
+                "language_code": self._language_code,
             }
             if self.audio_data_callback:
                 self.audio_data_callback(json.dumps(response))
