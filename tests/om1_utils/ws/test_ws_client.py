@@ -97,7 +97,6 @@ def test_stop_client(client, mock_websocket):
     mock_websocket.close.assert_called_once()
 
 
-@pytest.mark.timeout(5)  # Prevent test from hanging
 def test_receive_messages_with_callback(client, mock_websocket):
     """Test message receiving with callback"""
     received_messages = []

@@ -5,7 +5,7 @@ import logging
 import subprocess
 import threading
 import time
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import cv2
 import numpy as np
@@ -28,9 +28,9 @@ class GazeboVideoStream:
     Parameters
     ----------
     frame_callback : Optional[Callable[[str], None]], optional
-        Callback function to handle processed frame data.
-        Function receives base64 encoded frame data.
-        By default None
+    frame_callbacks : Optional[List[Callable[[str], None]]], optional
+        List of callback functions to be called with base64 encoded frame data,
+        by default None
     fps : Optional[int], optional
         Frames per second to capture.
         By default 30
@@ -42,13 +42,15 @@ class GazeboVideoStream:
     def __init__(
         self,
         frame_callback: Optional[Callable[[str], None]] = None,
+        frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
         topic: Optional[str] = "/camera",
     ):
         self._video_thread: Optional[threading.Thread] = None
 
-        # Callback for video frame data
-        self.frame_callback = frame_callback
+        # Callbacks for video frame data
+        self.frame_callbacks = frame_callbacks or []
+        self.register_frame_callback(frame_callback)
 
         # Video capture device
         self._cap = None
@@ -207,13 +209,14 @@ class GazeboVideoStream:
                 _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 frame_data = base64.b64encode(buffer).decode("utf-8")
 
-                if self.frame_callback:
-                    if inspect.iscoroutinefunction(self.frame_callback):
-                        asyncio.run_coroutine_threadsafe(
-                            self.frame_callback(frame_data), self.loop
-                        )
-                    else:
-                        self.frame_callback(frame_data)
+                if self.frame_callbacks:
+                    for frame_callback in self.frame_callbacks:
+                        if inspect.iscoroutinefunction(frame_callback):
+                            asyncio.run_coroutine_threadsafe(
+                                frame_callback(frame_data), self.loop
+                            )
+                        else:
+                            frame_callback(frame_data)
 
                 time.sleep(
                     self.frame_delay
@@ -243,7 +246,17 @@ class GazeboVideoStream:
         frame_callback : Callable[[str], None]
             Function to be called with base64 encoded frame data
         """
-        self.frame_callback = frame_callback
+        if frame_callback is None:
+            logger.warning("Frame callback is None, not registering")
+            return
+
+        if frame_callback not in self.frame_callbacks:
+            self.frame_callbacks.append(frame_callback)
+            logger.info("Registered new frame callback")
+            return
+
+        logger.warning("Frame callback already registered")
+        return
 
     def start(self):
         """
