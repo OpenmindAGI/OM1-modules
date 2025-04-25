@@ -5,7 +5,7 @@ import logging
 import platform
 import threading
 import time
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import cv2
 
@@ -39,6 +39,7 @@ class VideoStream:
         frame_callback: Optional[Callable[[str], None]] = None,
         frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
+        resolution: Optional[Tuple[int, int]] = (480, 270),
     ):
         self._video_thread: Optional[threading.Thread] = None
 
@@ -53,6 +54,7 @@ class VideoStream:
 
         self.fps = fps
         self.frame_delay = 1.0 / fps  # Calculate delay between frames
+        self.resolution = resolution
 
         # Create a dedicated event loop for async tasks
         self.loop = asyncio.new_event_loop()
@@ -98,8 +100,12 @@ class VideoStream:
                     time.sleep(0.1)
                     continue
 
+                resized_frame = cv2.resize(frame, self.resolution)
+
                 # Convert frame to base64
-                _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                _, buffer = cv2.imencode(
+                    ".jpg", resized_frame, [cv2.IMWRITE_JPEG_QUALITY, 80]
+                )
                 frame_data = base64.b64encode(buffer).decode("utf-8")
 
                 if self.frame_callbacks:
