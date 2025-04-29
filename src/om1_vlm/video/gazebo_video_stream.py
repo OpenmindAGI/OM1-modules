@@ -194,6 +194,9 @@ class GazeboVideoStream:
         """
 
         try:
+            frame_time = 1.0 / self.fps
+            last_frame_time = time.time()
+
             while self.running:
                 text_data = self._get_message()
 
@@ -210,8 +213,12 @@ class GazeboVideoStream:
                     logging.debug("Unable to process current image message")
                     return
 
+                resized_frame = cv2.resize(frame, self.resolution)
+
                 # Convert frame to base64
-                _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                _, buffer = cv2.imencode(
+                    ".jpg", resized_frame, [cv2.IMWRITE_JPEG_QUALITY, 80]
+                )
                 frame_data = base64.b64encode(buffer).decode("utf-8")
 
                 if self.frame_callbacks:
@@ -223,9 +230,10 @@ class GazeboVideoStream:
                         else:
                             frame_callback(frame_data)
 
-                time.sleep(
-                    self.frame_delay
-                )  # Use calculated frame delay instead of hardcoded value
+                current_time = time.time()
+                if current_time - last_frame_time < frame_time:
+                    time.sleep(frame_time - (current_time - last_frame_time))
+                last_frame_time = current_time
 
         except Exception as e:
             logger.error(f"Error streaming video: {e}")

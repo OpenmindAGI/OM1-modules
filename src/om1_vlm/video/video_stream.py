@@ -32,6 +32,9 @@ class VideoStream:
     fps : Optional[int], optional
         Frames per second to capture.
         By default 30
+    resolution : Optional[Tuple[int, int]], optional
+        Resolution of the captured video frames.
+        By default (480, 270)
     """
 
     def __init__(
@@ -92,6 +95,9 @@ class VideoStream:
             logger.error(f"Error opening video stream from {camindex}")
             return
 
+        frame_time = 1.0 / self.fps
+        last_frame_time = time.time()
+
         try:
             while self.running:
                 ret, frame = self._cap.read()
@@ -117,9 +123,10 @@ class VideoStream:
                         else:
                             frame_callback(frame_data)
 
-                time.sleep(
-                    self.frame_delay
-                )  # Use calculated frame delay instead of hardcoded value
+                current_time = time.time()
+                if current_time - last_frame_time < frame_time:
+                    time.sleep(frame_time - (current_time - last_frame_time))
+                last_frame_time = current_time
 
         except Exception as e:
             logger.error(f"Error streaming video: {e}")
