@@ -5,7 +5,7 @@ import logging
 import subprocess
 import threading
 import time
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -34,6 +34,9 @@ class GazeboVideoStream:
     fps : Optional[int], optional
         Frames per second to capture.
         By default 30
+    resolution : Optional[Tuple[int, int]], optional
+        Resolution of the captured video frames.
+        By default (480, 270)
     topic : Optional[str], optional
         Gazebo topic to obtain simulated camera feed.
         By default /camera
@@ -44,6 +47,7 @@ class GazeboVideoStream:
         frame_callback: Optional[Callable[[str], None]] = None,
         frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
+        resolution: Optional[Tuple[int, int]] = (480, 270),
         topic: Optional[str] = "/camera",
     ):
         self._video_thread: Optional[threading.Thread] = None
@@ -60,6 +64,7 @@ class GazeboVideoStream:
 
         self.fps = fps
         self.frame_delay = 1.0 / fps  # Calculate delay between frames
+        self.resolution = resolution
 
         # Create a dedicated event loop for async tasks
         self.loop = asyncio.new_event_loop()
