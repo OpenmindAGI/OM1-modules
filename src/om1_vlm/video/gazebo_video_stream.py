@@ -195,7 +195,7 @@ class GazeboVideoStream:
 
         try:
             frame_time = 1.0 / self.fps
-            last_frame_time = time.time()
+            last_frame_time = time.perf_counter()
 
             while self.running:
                 text_data = self._get_message()
@@ -230,10 +230,10 @@ class GazeboVideoStream:
                         else:
                             frame_callback(frame_data)
 
-                current_time = time.time()
-                if current_time - last_frame_time < frame_time:
-                    time.sleep(frame_time - (current_time - last_frame_time))
-                last_frame_time = current_time
+                elapsed_time = time.perf_counter() - last_frame_time
+                if elapsed_time < frame_time:
+                    time.sleep(frame_time - elapsed_time)
+                last_frame_time = time.perf_counter()
 
         except Exception as e:
             logger.error(f"Error streaming video: {e}")
