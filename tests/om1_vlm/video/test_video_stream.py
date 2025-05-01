@@ -110,7 +110,8 @@ def mock_enumerate_devices():
 def test_video_stream_initialization():
     callback = Mock()
     stream = VideoStream(frame_callback=callback)
-    assert stream.frame_callback == callback
+    assert len(stream.frame_callbacks) == 1
+    assert stream.frame_callbacks[0] == callback
     assert stream.running
     assert stream._video_thread is None
 
@@ -247,7 +248,19 @@ def test_register_frame_callback():
     stream = VideoStream()
     callback = Mock()
     stream.register_frame_callback(callback)
-    assert stream.frame_callback == callback
+    assert len(stream.frame_callbacks) == 1
+    assert stream.frame_callbacks[0] == callback
+
+
+def test_register_multiple_frame_callbacks():
+    stream = VideoStream()
+    callback1 = Mock()
+    callback2 = Mock()
+    stream.register_frame_callback(callback1)
+    stream.register_frame_callback(callback2)
+    assert len(stream.frame_callbacks) == 2
+    assert stream.frame_callbacks[0] == callback1
+    assert stream.frame_callbacks[1] == callback2
 
 
 @pytest.mark.usefixtures("mock_cv2", "mock_platform", "mock_enumerate_devices")

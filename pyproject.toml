@@ -21,6 +21,7 @@ websockets = "^13.0"
 opencv-python = "^4.5.0"
 requests = "^2.32.3"
 protobuf = "^5.29.3"
+google = "^3.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0"
