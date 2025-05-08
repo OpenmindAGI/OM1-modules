@@ -61,7 +61,7 @@ class VideoStream:
         self.fps = fps
         self.frame_delay = 1.0 / fps  # Calculate delay between frames
         self.resolution = resolution
-        self.encode_quality = self.encode_params = [
+        self.encode_quality = [
             cv2.IMWRITE_JPEG_QUALITY,
             jpeg_quality,
         ]
