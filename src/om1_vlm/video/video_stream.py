@@ -35,6 +35,8 @@ class VideoStream:
     resolution : Optional[Tuple[int, int]], optional
         Resolution of the captured video frames.
         By default (480, 270)
+    jpeg_quality : int, optional
+        JPEG quality for encoding frames, by default 70
     """
 
     def __init__(
@@ -43,6 +45,7 @@ class VideoStream:
         frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
         resolution: Optional[Tuple[int, int]] = (480, 270),
+        jpeg_quality: int = 70,
     ):
         self._video_thread: Optional[threading.Thread] = None
 
@@ -58,6 +61,10 @@ class VideoStream:
         self.fps = fps
         self.frame_delay = 1.0 / fps  # Calculate delay between frames
         self.resolution = resolution
+        self.encode_quality = self.encode_params = [
+            cv2.IMWRITE_JPEG_QUALITY,
+            jpeg_quality,
+        ]
 
         # Create a dedicated event loop for async tasks
         self.loop = asyncio.new_event_loop()
@@ -95,6 +102,15 @@ class VideoStream:
             logger.error(f"Error opening video stream from {camindex}")
             return
 
+        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+        self._cap.set(cv2.CAP_PROP_FPS, self.fps)
+
+        try:
+            self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
+
         frame_time = 1.0 / self.fps
         last_frame_time = time.perf_counter()
 
@@ -108,13 +124,10 @@ class VideoStream:
 
                 resized_frame = cv2.resize(frame, self.resolution)
 
-                # Convert frame to base64
-                _, buffer = cv2.imencode(
-                    ".jpg", resized_frame, [cv2.IMWRITE_JPEG_QUALITY, 80]
-                )
-                frame_data = base64.b64encode(buffer).decode("utf-8")
-
                 if self.frame_callbacks:
+                    _, buffer = cv2.imencode(".jpg", resized_frame, self.encode_params)
+                    frame_data = base64.b64encode(buffer).decode("utf-8")
+
                     for frame_callback in self.frame_callbacks:
                         if inspect.iscoroutinefunction(frame_callback):
                             asyncio.run_coroutine_threadsafe(
