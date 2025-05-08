@@ -34,7 +34,7 @@ class VideoStream:
         By default 30
     resolution : Optional[Tuple[int, int]], optional
         Resolution of the captured video frames.
-        By default (640, 480)
+        By default (640, 360)
     jpeg_quality : int, optional
         JPEG quality for encoding frames, by default 70
     """
@@ -44,7 +44,7 @@ class VideoStream:
         frame_callback: Optional[Callable[[str], None]] = None,
         frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
-        resolution: Optional[Tuple[int, int]] = (640, 480),
+        resolution: Optional[Tuple[int, int]] = (640, 360),
         jpeg_quality: int = 70,
     ):
         self._video_thread: Optional[threading.Thread] = None
