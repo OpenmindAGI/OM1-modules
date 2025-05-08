@@ -34,7 +34,7 @@ class VideoStream:
         By default 30
     resolution : Optional[Tuple[int, int]], optional
         Resolution of the captured video frames.
-        By default (640, 360)
+        By default (640, 480)
     jpeg_quality : int, optional
         JPEG quality for encoding frames, by default 70
     """
@@ -44,7 +44,7 @@ class VideoStream:
         frame_callback: Optional[Callable[[str], None]] = None,
         frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
-        resolution: Optional[Tuple[int, int]] = (640, 360),
+        resolution: Optional[Tuple[int, int]] = (640, 480),
         jpeg_quality: int = 70,
     ):
         self._video_thread: Optional[threading.Thread] = None
@@ -119,18 +119,26 @@ class VideoStream:
         except Exception:
             pass
 
+        try:
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        except Exception:
+            pass
+
         frame_time = 1.0 / self.fps
         last_frame_time = time.perf_counter()
 
         try:
             while self.running:
+                current_time = time.perf_counter()
+                elapsed = current_time - last_frame_time
+
                 ret, frame = self._cap.read()
                 if not ret:
                     logger.error("Error reading frame from video stream")
                     time.sleep(0.1)
                     continue
 
-                if self.frame_callbacks:
+                if elapsed <= 1.5 * frame_time and self.frame_callbacks:
                     _, buffer = cv2.imencode(".jpg", frame, self.encode_quality)
                     frame_data = base64.b64encode(buffer).decode("utf-8")
 
