@@ -34,7 +34,7 @@ class VideoStream:
         By default 30
     resolution : Optional[Tuple[int, int]], optional
         Resolution of the captured video frames.
-        By default (480, 270)
+        By default (640, 480)
     jpeg_quality : int, optional
         JPEG quality for encoding frames, by default 70
     """
@@ -44,7 +44,7 @@ class VideoStream:
         frame_callback: Optional[Callable[[str], None]] = None,
         frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
-        resolution: Optional[Tuple[int, int]] = (480, 270),
+        resolution: Optional[Tuple[int, int]] = (640, 480),
         jpeg_quality: int = 70,
     ):
         self._video_thread: Optional[threading.Thread] = None
@@ -106,6 +106,14 @@ class VideoStream:
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
         self._cap.set(cv2.CAP_PROP_FPS, self.fps)
 
+        actual_width = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        if actual_width != self.resolution[0] or actual_height != self.resolution[1]:
+            logger.warning(
+                f"Camera doesn't support resolution {self.resolution}. Using {(actual_width, actual_height)} instead."
+            )
+            self.resolution = (actual_width, actual_height)
+
         try:
             self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         except Exception:
@@ -122,17 +130,8 @@ class VideoStream:
                     time.sleep(0.1)
                     continue
 
-                if (
-                    frame.shape[0] != self.resolution[1]
-                    or frame.shape[1] != self.resolution[0]
-                ):
-                    logger.warning(
-                        f"Frame shape {frame.shape} does not match resolution {self.resolution}"
-                    )
-                    frame = cv2.resize(frame, self.resolution)
-
                 if self.frame_callbacks:
-                    _, buffer = cv2.imencode(".jpg", frame, self.encode_params)
+                    _, buffer = cv2.imencode(".jpg", frame, self.encode_quality)
                     frame_data = base64.b64encode(buffer).decode("utf-8")
 
                     for frame_callback in self.frame_callbacks:
