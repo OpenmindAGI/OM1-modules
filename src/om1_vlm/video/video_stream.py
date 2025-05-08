@@ -122,10 +122,17 @@ class VideoStream:
                     time.sleep(0.1)
                     continue
 
-                resized_frame = cv2.resize(frame, self.resolution)
+                if (
+                    frame.shape[0] != self.resolution[1]
+                    or frame.shape[1] != self.resolution[0]
+                ):
+                    logger.warning(
+                        f"Frame shape {frame.shape} does not match resolution {self.resolution}"
+                    )
+                    frame = cv2.resize(frame, self.resolution)
 
                 if self.frame_callbacks:
-                    _, buffer = cv2.imencode(".jpg", resized_frame, self.encode_params)
+                    _, buffer = cv2.imencode(".jpg", frame, self.encode_params)
                     frame_data = base64.b64encode(buffer).decode("utf-8")
 
                     for frame_callback in self.frame_callbacks:
