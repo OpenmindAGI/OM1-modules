@@ -36,6 +36,12 @@ class MockVideoCapture:
         self.is_opened = False
         self.release_called = True
 
+    def set(self, prop_id, value):
+        pass
+
+    def get(self, prop_id):
+        return 100
+
 
 @pytest.fixture
 def mock_cv2():
