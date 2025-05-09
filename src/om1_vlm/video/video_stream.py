@@ -34,7 +34,9 @@ class VideoStream:
         By default 30
     resolution : Optional[Tuple[int, int]], optional
         Resolution of the captured video frames.
-        By default (480, 270)
+        By default (640, 480)
+    jpeg_quality : int, optional
+        JPEG quality for encoding frames, by default 70
     """
 
     def __init__(
@@ -42,7 +44,8 @@ class VideoStream:
         frame_callback: Optional[Callable[[str], None]] = None,
         frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
-        resolution: Optional[Tuple[int, int]] = (480, 270),
+        resolution: Optional[Tuple[int, int]] = (640, 480),
+        jpeg_quality: int = 70,
     ):
         self._video_thread: Optional[threading.Thread] = None
 
@@ -58,6 +61,10 @@ class VideoStream:
         self.fps = fps
         self.frame_delay = 1.0 / fps  # Calculate delay between frames
         self.resolution = resolution
+        self.encode_quality = [
+            cv2.IMWRITE_JPEG_QUALITY,
+            jpeg_quality,
+        ]
 
         # Create a dedicated event loop for async tasks
         self.loop = asyncio.new_event_loop()
@@ -95,26 +102,46 @@ class VideoStream:
             logger.error(f"Error opening video stream from {camindex}")
             return
 
+        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+        self._cap.set(cv2.CAP_PROP_FPS, self.fps)
+
+        actual_width = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        if actual_width != self.resolution[0] or actual_height != self.resolution[1]:
+            logger.warning(
+                f"Camera doesn't support resolution {self.resolution}. Using {(actual_width, actual_height)} instead."
+            )
+            self.resolution = (actual_width, actual_height)
+
+        try:
+            self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
+
+        try:
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        except Exception:
+            pass
+
         frame_time = 1.0 / self.fps
         last_frame_time = time.perf_counter()
 
         try:
             while self.running:
+                current_time = time.perf_counter()
+                elapsed = current_time - last_frame_time
+
                 ret, frame = self._cap.read()
                 if not ret:
                     logger.error("Error reading frame from video stream")
                     time.sleep(0.1)
                     continue
 
-                resized_frame = cv2.resize(frame, self.resolution)
+                if elapsed <= 1.5 * frame_time and self.frame_callbacks:
+                    _, buffer = cv2.imencode(".jpg", frame, self.encode_quality)
+                    frame_data = base64.b64encode(buffer).decode("utf-8")
 
-                # Convert frame to base64
-                _, buffer = cv2.imencode(
-                    ".jpg", resized_frame, [cv2.IMWRITE_JPEG_QUALITY, 80]
-                )
-                frame_data = base64.b64encode(buffer).decode("utf-8")
-
-                if self.frame_callbacks:
                     for frame_callback in self.frame_callbacks:
                         if inspect.iscoroutinefunction(frame_callback):
                             asyncio.run_coroutine_threadsafe(

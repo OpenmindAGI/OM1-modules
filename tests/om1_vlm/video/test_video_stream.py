@@ -14,6 +14,11 @@ class MockVideoCapture:
         self.frame_count = 0
         self.release_called = False
         self._mock_stream = None
+        self._properties = {
+            3: 640,
+            4: 480,
+            5: 30,
+        }
 
     def isOpened(self):
         is_open = self.is_opened
@@ -35,6 +40,12 @@ class MockVideoCapture:
     def release(self):
         self.is_opened = False
         self.release_called = True
+
+    def set(self, prop_id, value):
+        self._properties[prop_id] = value
+
+    def get(self, prop_id):
+        return self._properties.get(prop_id, 100)
 
 
 @pytest.fixture
