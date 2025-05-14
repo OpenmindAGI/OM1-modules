@@ -1,4 +1,5 @@
 import logging
+import platform
 
 import cv2
 from cv2 import MatLike
@@ -32,7 +33,12 @@ class YOLOFaceDetection:
         self._margin = margin
 
         try:
-            self._model = YOLO("yolov8-lit-s.pt")
+            if platform.system() == "Darwin" and platform.machine() == "arm64":
+                logger.info("Loading YOLO model for macOS ARM64 with CoreML")
+                self._model = YOLO("yolov8n-face.mlpackage")
+            else:
+                logger.info("Loading YOLO model for other platforms")
+                self._model = YOLO("yolov8-lit-s.pt")
         except Exception as e:
             logger.error(f"Failed to load YOLO model: {e}")
 
