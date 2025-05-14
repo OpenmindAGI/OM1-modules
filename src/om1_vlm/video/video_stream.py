@@ -9,6 +9,7 @@ from typing import Callable, List, Optional, Tuple
 
 import cv2
 
+from ..blur import YOLOFaceDetection
 from .video_utils import enumerate_video_devices
 
 root_package_name = __name__.split(".")[0] if "." in __name__ else __name__
@@ -46,12 +47,47 @@ class VideoStream:
         fps: Optional[int] = 30,
         resolution: Optional[Tuple[int, int]] = (640, 480),
         jpeg_quality: int = 70,
+        blur_enabled: bool = True,
+        blur_conf: float = 0.3,
+        blur_margin: int = 30,
     ):
+        """
+        Initialize the VideoStream class.
+        Sets up the video capture device, frame processing, and
+        streaming callbacks.
+
+        Parameters
+        ----------
+        frame_callback : Optional[Callable[[str], None]], optional
+            Function to be called with base64 encoded frame data,
+            by default None
+        frame_callbacks : Optional[List[Callable[[str], None]]], optional
+            List of callback functions to be called with base64 encoded frame data,
+            by default None
+        fps : Optional[int], optional
+            Frames per second to capture.
+            By default 30
+        resolution : Optional[Tuple[int, int]], optional
+            Resolution of the captured video frames.
+            By default (640, 480)
+        jpeg_quality : int, optional
+            JPEG quality for encoding frames, by default 70
+        blur_enabled : bool, optional
+            Whether to enable face blurring, by default True
+        blur_conf : float, optional
+            Confidence threshold for face detection, by default 0.3
+        blur_margin : int, optional
+            Margin around detected faces, by default 30
+        """
         self._video_thread: Optional[threading.Thread] = None
 
         # Callbacks for video frame data
         self.frame_callbacks = frame_callbacks or []
         self.register_frame_callback(frame_callback)
+
+        # Initialize YOLO face detection
+        self.blur_enabled = blur_enabled
+        self.yolo_face_detection = YOLOFaceDetection(conf=blur_conf, margin=blur_margin)
 
         # Video capture device
         self._cap = None
@@ -137,6 +173,9 @@ class VideoStream:
                     logger.error("Error reading frame from video stream")
                     time.sleep(0.1)
                     continue
+
+                if self.blur_enabled and frame is not None:
+                    frame = self.yolo_face_detection.detect(frame)
 
                 if elapsed <= 1.5 * frame_time and self.frame_callbacks:
                     _, buffer = cv2.imencode(".jpg", frame, self.encode_quality)
