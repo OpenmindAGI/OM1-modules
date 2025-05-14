@@ -1,5 +1,6 @@
 import logging
 import platform
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -9,6 +10,10 @@ from om1_utils import singleton
 
 root_package_name = __name__.split(".")[0] if "." in __name__ else __name__
 logger = logging.getLogger(root_package_name)
+
+default_path = Path(__file__).parent
+yolov8n_mlpackage_path = default_path / "yolov8n-face.mlpackage"
+yolov8n_lite_path = default_path / "yolov8-lite-s.pt"
 
 
 @singleton
@@ -35,10 +40,10 @@ class YOLOFaceDetection:
         try:
             if platform.system() == "Darwin" and platform.machine() == "arm64":
                 logger.info("Loading YOLO model for macOS ARM64 with CoreML")
-                self._model = YOLO("yolov8n-face.mlpackage")
+                self._model = YOLO(yolov8n_mlpackage_path)
             else:
                 logger.info("Loading YOLO model for other platforms")
-                self._model = YOLO("yolov8-lit-s.pt")
+                self._model = YOLO(yolov8n_lite_path)
         except Exception as e:
             logger.error(f"Failed to load YOLO model: {e}")
 
