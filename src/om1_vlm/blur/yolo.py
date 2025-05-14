@@ -2,7 +2,7 @@ import logging
 import platform
 
 import cv2
-from cv2 import MatLike
+import numpy as np
 from ultralytics import YOLO
 
 from om1_utils import singleton
@@ -42,18 +42,18 @@ class YOLOFaceDetection:
         except Exception as e:
             logger.error(f"Failed to load YOLO model: {e}")
 
-    def detect(self, frame: MatLike) -> MatLike:
+    def detect(self, frame: np.ndarray) -> np.ndarray:
         """
         Detect faces in the given frame using the YOLO model.
 
         Parameters
         ----------
-        frame : MatLike
+        frame : np.ndarray
             The input frame in which to detect faces.
 
         Returns
         -------
-        MatLike
+        np.ndarray
             The frame with detected faces blurred.
         """
         if self._model is None:

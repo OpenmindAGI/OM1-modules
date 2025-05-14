@@ -1,3 +1,3 @@
-from yolo import YOLOFaceDetection
+from .yolo import YOLOFaceDetection
 
 __all__ = ["YOLOFaceDetection"]
