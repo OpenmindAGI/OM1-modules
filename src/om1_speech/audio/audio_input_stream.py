@@ -6,7 +6,7 @@ import json
 import logging
 import queue
 import threading
-from typing import Any, Callable, Dict, Generator, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import pyaudio
 
@@ -51,6 +51,7 @@ class AudioInputStream:
         device: Optional[Union[str, int, float, Any]] = None,
         device_name: str = None,
         audio_data_callback: Optional[Callable] = None,
+        audio_data_callbacks: Optional[List[Callable]] = None,
         language_code: Optional[str] = None,
     ):
         self._rate = rate
@@ -67,7 +68,8 @@ class AudioInputStream:
             logger.info(f"Using specified language code: {self._language_code}")
 
         # Callback for audio data
-        self.audio_data_callback = audio_data_callback
+        self._audio_data_callbacks = audio_data_callbacks or []
+        self.register_audio_data_callback(audio_data_callback)
 
         # Flag to indicate if TTS is active
         self._is_tts_active: bool = False
@@ -173,6 +175,27 @@ class AudioInputStream:
         with self._lock:
             self._is_tts_active = is_active
             logger.info(f"TTS active state changed to: {is_active}")
+
+    def register_audio_data_callback(self, audio_callback: Callable):
+        """
+        Registers a callback function for audio data processing.
+
+        Parameters
+        ----------
+        callback : Callable
+            Function to be called with audio data chunks
+        """
+        if audio_callback is None:
+            logger.warning("Audio data callback is None, not registering")
+            return
+
+        if audio_callback not in self._audio_data_callbacks:
+            self._audio_data_callbacks.append(audio_callback)
+            logger.info("Registered new audio data callback")
+            return
+
+        logger.warning("Audio data callback already registered")
+        return
 
     def start(self) -> "AudioInputStream":
         """
@@ -297,8 +320,8 @@ class AudioInputStream:
                 "rate": self._rate,
                 "language_code": self._language_code,
             }
-            if self.audio_data_callback:
-                self.audio_data_callback(json.dumps(response))
+            for audio_callback in self._audio_data_callbacks:
+                audio_callback(json.dumps(response))
 
             yield response
 

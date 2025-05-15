@@ -83,6 +83,14 @@ def test_start_with_specific_device(mock_pyaudio):
     mock_pyaudio.return_value.get_device_info_by_index.assert_called_once_with(1)
 
 
+def test_audio_data_callbacks(mock_pyaudio):
+    """Test audio data callbacks"""
+    stream = AudioInputStream(device=1)
+    stream.register_audio_data_callback(lambda data: None)
+
+    assert len(stream._audio_data_callbacks) == 1
+
+
 @pytest.mark.parametrize("is_active", [True, False])
 def test_tts_state_change(audio_stream, is_active):
     """Test TTS state changes"""
