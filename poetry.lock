@@ -13,6 +13,27 @@ files = [
 ]
 
 [[package]]
+name = "attrs"
+version = "25.3.0"
+description = "Classes Without Boilerplate"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "attrs-25.3.0-py3-none-any.whl", hash = "sha256:427318ce031701fea540783410126f03899a97ffc6f61596ad581ac2e40e3bc3"},
+    {file = "attrs-25.3.0.tar.gz", hash = "sha256:75d7cefc7fb576747b2c81b4442d4d4a1ce0900973527c011d1030fd3bf4af1b"},
+]
+
+[package.extras]
+benchmark = ["cloudpickle", "hypothesis", "mypy (>=1.11.1)", "pympler", "pytest (>=4.3.0)", "pytest-codspeed", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
+cov = ["cloudpickle", "coverage[toml] (>=5.3)", "hypothesis", "mypy (>=1.11.1)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
+dev = ["cloudpickle", "hypothesis", "mypy (>=1.11.1)", "pre-commit-uv", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
+docs = ["cogapp", "furo", "myst-parser", "sphinx", "sphinx-notfound-page", "sphinxcontrib-towncrier", "towncrier"]
+tests = ["cloudpickle", "hypothesis", "mypy (>=1.11.1)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
+tests-mypy = ["mypy (>=1.11.1)", "pytest-mypy-plugins"]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.13.4"
 description = "Screen-scraping library"
@@ -83,6 +104,47 @@ colorama = ["colorama (>=0.4.3)"]
 d = ["aiohttp (>=3.10)"]
 jupyter = ["ipython (>=7.8.0)", "tokenize-rt (>=3.2.0)"]
 uvloop = ["uvloop (>=0.15.2)"]
+
+[[package]]
+name = "blinker"
+version = "1.9.0"
+description = "Fast, simple object-to-object and broadcast signaling"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "blinker-1.9.0-py3-none-any.whl", hash = "sha256:ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc"},
+    {file = "blinker-1.9.0.tar.gz", hash = "sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf"},
+]
+
+[[package]]
+name = "cattrs"
+version = "24.1.3"
+description = "Composable complex class support for attrs and dataclasses."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "cattrs-24.1.3-py3-none-any.whl", hash = "sha256:adf957dddd26840f27ffbd060a6c4dd3b2192c5b7c2c0525ef1bd8131d8a83f5"},
+    {file = "cattrs-24.1.3.tar.gz", hash = "sha256:981a6ef05875b5bb0c7fb68885546186d306f10f0f6718fe9b96c226e68821ff"},
+]
+
+[package.dependencies]
+attrs = ">=23.1.0"
+exceptiongroup = {version = ">=1.1.1", markers = "python_version < \"3.11\""}
+typing-extensions = {version = ">=4.1.0,<4.6.3 || >4.6.3", markers = "python_version < \"3.11\""}
+
+[package.extras]
+bson = ["pymongo (>=4.4.0)"]
+cbor2 = ["cbor2 (>=5.4.6)"]
+msgpack = ["msgpack (>=1.0.5)"]
+msgspec = ["msgspec (>=0.18.5)"]
+orjson = ["orjson (>=3.9.2)"]
+pyyaml = ["pyyaml (>=6.0)"]
+tomlkit = ["tomlkit (>=0.11.8)"]
+ujson = ["ujson (>=5.7.0)"]
 
 [[package]]
 name = "certifi"
@@ -219,7 +281,7 @@ version = "8.1.8"
 description = "Composable command line interface toolkit"
 optional = false
 python-versions = ">=3.7"
-groups = ["dev"]
+groups = ["main", "dev"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
     {file = "click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2"},
@@ -329,6 +391,45 @@ test = ["Pillow", "contourpy[test-no-images]", "matplotlib"]
 test-no-images = ["pytest", "pytest-cov", "pytest-rerunfailures", "pytest-xdist", "wurlitzer"]
 
 [[package]]
+name = "coremltools"
+version = "8.3.0"
+description = "Community Tools for Core ML"
+optional = false
+python-versions = "*"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "coremltools-8.3.0-cp310-none-macosx_10_15_x86_64.whl", hash = "sha256:730831927cde3ba39ae6f80b72c5fbff8820393f2f97ec1c98ab33ec08094c4e"},
+    {file = "coremltools-8.3.0-cp310-none-macosx_11_0_arm64.whl", hash = "sha256:5f95af47531fb2f01a501ae5fad01e7dfb1cc0b70b035fbed6d788201cbc9a56"},
+    {file = "coremltools-8.3.0-cp310-none-manylinux1_x86_64.whl", hash = "sha256:e505c2b89b5bd1b1425466a8d45cc6edd75c81b0c3834403992a575a1c134c34"},
+    {file = "coremltools-8.3.0-cp311-none-macosx_10_15_x86_64.whl", hash = "sha256:59ff68ec62bf2c0421041142117e37ef679f46e6304653aea64cbe8a39a5f9bc"},
+    {file = "coremltools-8.3.0-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:5f843f5a6be740d84eb7c80c49766da0b9bd67e86a9cb1dbfce838ab5366feb3"},
+    {file = "coremltools-8.3.0-cp311-none-manylinux1_x86_64.whl", hash = "sha256:3d6d5828688347b5f6e31f1ce522b5df5733246611dbcb09fbc94687ff0fc16a"},
+    {file = "coremltools-8.3.0-cp312-none-macosx_10_15_x86_64.whl", hash = "sha256:2bfb57173a9fcbeb1f5bd3bfc90169c817ee04882564eafb79deafa494f96523"},
+    {file = "coremltools-8.3.0-cp312-none-macosx_11_0_arm64.whl", hash = "sha256:e8a70ca3b34676cbcb61f70e1192593062eb85a9a64e29e03268d6f280b2c86e"},
+    {file = "coremltools-8.3.0-cp312-none-manylinux1_x86_64.whl", hash = "sha256:36ee21f1ab35bd45500ce006b366d45f4210a86882283d6cf2e603faeaaf791c"},
+    {file = "coremltools-8.3.0-cp37-none-macosx_10_15_x86_64.whl", hash = "sha256:e112283deb9c507f282949243751b71c107c2ca8a00962a470201f2941fb055a"},
+    {file = "coremltools-8.3.0-cp37-none-manylinux1_x86_64.whl", hash = "sha256:e10fb8e8a067ff413ed8dce0b8967cd1ea1ba20340b1039e4e0556172c12783d"},
+    {file = "coremltools-8.3.0-cp38-none-macosx_10_15_x86_64.whl", hash = "sha256:2806da71465d76b323b418e6280db82c936cb910ad823feb58602dd53606534e"},
+    {file = "coremltools-8.3.0-cp38-none-macosx_11_0_arm64.whl", hash = "sha256:7cafdf5977c7b792b8782d4a3d4c9318390bb2fcef296bbf86b4f6d23be82650"},
+    {file = "coremltools-8.3.0-cp38-none-manylinux1_x86_64.whl", hash = "sha256:02662da4b228a8f5fd907ef90606df06f3ccd7521e5f0e92d729fc30af61bd66"},
+    {file = "coremltools-8.3.0-cp39-none-macosx_10_15_x86_64.whl", hash = "sha256:5641601caf34a4b7c81ec3de495edf4219fe4c3226bab84c52c3350a0a1d3731"},
+    {file = "coremltools-8.3.0-cp39-none-macosx_11_0_arm64.whl", hash = "sha256:8ae0ed2d218833f024343361ef79a386880cc58f8673d02a994542bbe4c82998"},
+    {file = "coremltools-8.3.0-cp39-none-manylinux1_x86_64.whl", hash = "sha256:ef398f265942e36eaf12723f0378f9a82ef1916a96766328d4580fd6c3839326"},
+    {file = "coremltools-8.3.0.tar.gz", hash = "sha256:c95a6051606b71273d669b107b5f32d3191f595e6821b8db04baf49d52d0704f"},
+]
+
+[package.dependencies]
+attrs = ">=21.3.0"
+cattrs = "*"
+numpy = ">=1.14.5"
+packaging = "*"
+protobuf = ">=3.1.0"
+pyaml = "*"
+sympy = "*"
+tqdm = "*"
+
+[[package]]
 name = "cycler"
 version = "0.12.1"
 description = "Composable style cycles"
@@ -364,7 +465,7 @@ version = "1.2.2"
 description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
-groups = ["dev"]
+groups = ["main", "dev"]
 markers = "python_version < \"3.11\""
 files = [
     {file = "exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"},
@@ -391,6 +492,32 @@ files = [
 docs = ["furo (>=2024.8.6)", "sphinx (>=8.1.3)", "sphinx-autodoc-typehints (>=3)"]
 testing = ["covdefaults (>=2.3)", "coverage (>=7.6.10)", "diff-cover (>=9.2.1)", "pytest (>=8.3.4)", "pytest-asyncio (>=0.25.2)", "pytest-cov (>=6)", "pytest-mock (>=3.14)", "pytest-timeout (>=2.3.1)", "virtualenv (>=20.28.1)"]
 typing = ["typing-extensions (>=4.12.2)"]
+
+[[package]]
+name = "flask"
+version = "3.1.1"
+description = "A simple framework for building complex web applications."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "flask-3.1.1-py3-none-any.whl", hash = "sha256:07aae2bb5eaf77993ef57e357491839f5fd9f4dc281593a81a9e4d79a24f295c"},
+    {file = "flask-3.1.1.tar.gz", hash = "sha256:284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e"},
+]
+
+[package.dependencies]
+blinker = ">=1.9.0"
+click = ">=8.1.3"
+importlib-metadata = {version = ">=3.6.0", markers = "python_version < \"3.10\""}
+itsdangerous = ">=2.2.0"
+jinja2 = ">=3.1.2"
+markupsafe = ">=2.1.1"
+werkzeug = ">=3.1.0"
+
+[package.extras]
+async = ["asgiref (>=3.2)"]
+dotenv = ["python-dotenv"]
 
 [[package]]
 name = "fonttools"
@@ -549,6 +676,31 @@ files = [
 all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
 
 [[package]]
+name = "importlib-metadata"
+version = "8.7.0"
+description = "Read metadata from Python packages"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "python_version < \"3.10\""
+files = [
+    {file = "importlib_metadata-8.7.0-py3-none-any.whl", hash = "sha256:e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd"},
+    {file = "importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000"},
+]
+
+[package.dependencies]
+zipp = ">=3.20"
+
+[package.extras]
+check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1)"]
+cover = ["pytest-cov"]
+doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+enabler = ["pytest-enabler (>=2.2)"]
+perf = ["ipython"]
+test = ["flufl.flake8", "importlib_resources (>=1.3)", "jaraco.test (>=5.4)", "packaging", "pyfakefs", "pytest (>=6,!=8.1.*)", "pytest-perf (>=0.9.2)"]
+type = ["pytest-mypy"]
+
+[[package]]
 name = "importlib-resources"
 version = "6.5.2"
 description = "Read resources from Python packages"
@@ -600,6 +752,19 @@ files = [
 
 [package.extras]
 colors = ["colorama (>=0.4.6)"]
+
+[[package]]
+name = "itsdangerous"
+version = "2.2.0"
+description = "Safely pass data to untrusted environments and back."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "itsdangerous-2.2.0-py3-none-any.whl", hash = "sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef"},
+    {file = "itsdangerous-2.2.0.tar.gz", hash = "sha256:e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173"},
+]
 
 [[package]]
 name = "jinja2"
@@ -1603,6 +1768,25 @@ files = [
 ]
 
 [[package]]
+name = "pyaml"
+version = "25.1.0"
+description = "PyYAML-based module to produce a bit more pretty and readable YAML-serialized data"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "pyaml-25.1.0-py3-none-any.whl", hash = "sha256:f7b40629d2dae88035657c860f539db3525ddd0120a11e0bcb44d47d5968b3bc"},
+    {file = "pyaml-25.1.0.tar.gz", hash = "sha256:33a93ac49218f57e020b81e280d2706cea554ac5a76445ac79add760d019c709"},
+]
+
+[package.dependencies]
+PyYAML = "*"
+
+[package.extras]
+anchors = ["unidecode"]
+
+[[package]]
 name = "pyaudio"
 version = "0.2.14"
 description = "Cross-platform audio I/O with PortAudio"
@@ -2387,6 +2571,25 @@ files = [
 ]
 
 [[package]]
+name = "werkzeug"
+version = "3.1.3"
+description = "The comprehensive WSGI web application library."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
+files = [
+    {file = "werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e"},
+    {file = "werkzeug-3.1.3.tar.gz", hash = "sha256:60723ce945c19328679790e3282cc758aa4a6040e4bb330f53d30fa546d44746"},
+]
+
+[package.dependencies]
+MarkupSafe = ">=2.1.1"
+
+[package.extras]
+watchdog = ["watchdog (>=2.3)"]
+
+[[package]]
 name = "zipp"
 version = "3.21.0"
 description = "Backport of pathlib-compatible object wrapper for zip files"
@@ -2410,4 +2613,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9"
-content-hash = "2d7a0922b61ce7173b155145506e10a47229d2dd478b756b28398098e5a271ff"
+content-hash = "e3e2cdf7fb4bc1149bd6213aaa8d401fd0d03e03fe6c3400adcd3db0a56f6364"
