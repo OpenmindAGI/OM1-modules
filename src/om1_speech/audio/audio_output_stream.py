@@ -197,7 +197,9 @@ class AudioOutputStream:
         return base64.b64encode(silence_bytes)
 
     def _play_keepalive_sound(self):
-        """Play a very brief silent audio to keep Bluetooth speakers awake."""
+        """
+        Play a very brief silent audio to keep Bluetooth speakers awake.
+        """
         silence_audio = self._create_silence_audio(100)
         self._write_audio_raw(silence_audio, is_keepalive=True)
 
