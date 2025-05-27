@@ -202,7 +202,9 @@ class AudioOutputStream:
         self._write_audio_raw(silence_audio, is_keepalive=True)
 
     def _keepalive_worker(self):
-        """Background thread to play keepalive sounds every 60 seconds."""
+        """
+        Background thread to play keepalive sounds every 60 seconds.
+        """
         while self.running:
             current_time = time.time()
             if current_time - self._last_audio_time >= 60:
