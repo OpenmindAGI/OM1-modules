@@ -78,7 +78,9 @@ class AudioOutputStream:
         self._device = self._select_output_device()
 
     def _select_output_device(self) -> int:
-        """Select and validate audio output device."""
+        """
+        Select and validate audio output device.
+        """
         device_count = self._pyaudio_interface.get_device_count()
         logger.info(f"Found {device_count} audio devices")
 
