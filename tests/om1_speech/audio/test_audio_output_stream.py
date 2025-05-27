@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from om1_speech import AudioOutputStream
+from om1_speech.audio.audio_output_stream import AudioOutputStream
 
 
 @pytest.fixture
@@ -40,6 +40,13 @@ def mock_subprocess():
 
 
 @pytest.fixture
+def mock_ffplay():
+    with patch("om1_speech.audio.audio_output_stream.is_installed") as mock:
+        mock.return_value = True
+        yield mock
+
+
+@pytest.fixture
 def mock_requests():
     with patch("requests.post") as mock:
         # Setup mock response
@@ -53,7 +60,7 @@ def mock_requests():
 
 
 @pytest.fixture
-def audio_output(mock_pyaudio, mock_requests, mock_subprocess):
+def audio_output(mock_pyaudio, mock_requests, mock_subprocess, mock_ffplay):
     stream = AudioOutputStream(url="http://test-tts-server/tts", rate=16000)
     yield stream
     stream.stop()
@@ -255,3 +262,180 @@ def test_subprocess_error(audio_output, mock_subprocess, mock_requests):
 
     # Verify stream is still running despite the error
     assert audio_output.running is True
+
+
+def test_create_silence_audio(audio_output):
+    """Test silent audio generation"""
+    # Test default duration (500ms)
+    silence_audio = audio_output._create_silence_audio()
+    silence_bytes = base64.b64decode(silence_audio)
+
+    # Calculate expected size for 500ms at 16000 Hz (16-bit samples)
+    expected_samples = int(16000 * 500 / 1000)
+    expected_size = expected_samples * 2  # 16-bit = 2 bytes per sample
+
+    assert len(silence_bytes) == expected_size
+    assert silence_bytes == b"\x00" * expected_size
+
+    # Test custom duration (100ms)
+    silence_audio_100ms = audio_output._create_silence_audio(100)
+    silence_bytes_100ms = base64.b64decode(silence_audio_100ms)
+
+    expected_samples_100ms = int(16000 * 100 / 1000)
+    expected_size_100ms = expected_samples_100ms * 2
+
+    assert len(silence_bytes_100ms) == expected_size_100ms
+
+
+def test_keepalive_sound_generation(
+    mock_pyaudio, mock_subprocess, mock_requests, mock_ffplay
+):
+    """Test keepalive sound generation and playback"""
+    audio_output = AudioOutputStream(url="http://test-tts-server/tts", rate=16000)
+
+    # Start the stream to initialize keepalive thread
+    audio_output.start()
+
+    # Test keepalive sound generation
+    audio_output._play_keepalive_sound()
+
+    # Verify ffplay was called for keepalive
+    assert mock_subprocess.called
+
+    # Reset mock for verification
+    mock_subprocess.reset_mock()
+
+    # Test that keepalive doesn't trigger TTS callbacks
+    callback_called = False
+
+    def tts_callback(state):
+        nonlocal callback_called
+        callback_called = True
+
+    audio_output.set_tts_state_callback(tts_callback)
+    audio_output._play_keepalive_sound()
+
+    # Callback should not be triggered for keepalive sounds
+    assert callback_called is False
+
+    audio_output.stop()
+
+
+def test_audio_prefix_for_bluetooth(
+    mock_pyaudio, mock_subprocess, mock_requests, mock_ffplay
+):
+    """Test that audio has silence prefix to prevent Bluetooth clipping"""
+    audio_output = AudioOutputStream(url="http://test-tts-server/tts", rate=16000)
+
+    # Start processing
+    audio_output.start()
+
+    # Add test input
+    test_audio_data = base64.b64encode(b"original_audio_data").decode("utf-8")
+    mock_requests.return_value.json.return_value = {"response": test_audio_data}
+
+    audio_output.add_request({"text": "Test audio with prefix"})
+
+    # Wait for processing
+    time.sleep(0.1)
+
+    # Verify ffplay was called
+    assert mock_subprocess.called
+
+    # Get the audio data that was passed to ffplay via communicate
+    communicate_input = mock_subprocess.return_value.communicate.call_args[1]["input"]
+
+    # The audio should be longer than the original due to the silence prefix
+    original_audio = base64.b64decode(test_audio_data)
+    assert len(communicate_input) > len(original_audio)
+
+    audio_output.stop()
+
+
+def test_keepalive_timing(audio_output):
+    """Test keepalive timing logic"""
+    # Initialize last audio time
+    audio_output._last_audio_time = time.time() - 65  # 65 seconds ago
+
+    # Check if keepalive should trigger
+    current_time = time.time()
+    should_trigger = current_time - audio_output._last_audio_time >= 60
+
+    assert should_trigger is True
+
+    # Update time and check again
+    audio_output._last_audio_time = time.time()
+    should_trigger = current_time - audio_output._last_audio_time >= 60
+
+    assert should_trigger is False
+
+
+def test_keepalive_thread_behavior(
+    mock_pyaudio, mock_subprocess, mock_requests, mock_ffplay
+):
+    """Test keepalive thread behavior over time"""
+    audio_output = AudioOutputStream(url="http://test-tts-server/tts", rate=16000)
+
+    # Set last audio time to trigger keepalive
+    audio_output._last_audio_time = time.time() - 70
+
+    # Start the stream
+    audio_output.start()
+
+    # Wait briefly for keepalive thread to process
+    time.sleep(0.2)
+
+    # Verify keepalive sound was played
+    assert mock_subprocess.called
+
+    audio_output.stop()
+
+
+def test_write_audio_updates_last_audio_time(
+    mock_pyaudio, mock_subprocess, mock_requests, mock_ffplay
+):
+    """Test that _write_audio updates the last audio time"""
+    audio_output = AudioOutputStream(url="http://test-tts-server/tts", rate=16000)
+
+    initial_time = audio_output._last_audio_time
+
+    # Simulate writing audio
+    test_audio = base64.b64encode(b"test_audio").decode("utf-8")
+    audio_output._write_audio(test_audio)
+
+    # Verify last audio time was updated
+    assert audio_output._last_audio_time > initial_time
+
+    audio_output.stop()
+
+
+def test_keepalive_vs_regular_audio_callbacks(
+    mock_pyaudio, mock_subprocess, mock_requests, mock_ffplay
+):
+    """Test that keepalive sounds don't trigger TTS callbacks but regular audio does"""
+    audio_output = AudioOutputStream(url="http://test-tts-server/tts", rate=16000)
+
+    callback_states = []
+
+    def tts_callback(state):
+        callback_states.append(state)
+
+    audio_output.set_tts_state_callback(tts_callback)
+
+    # Test keepalive sound (should not trigger callbacks)
+    silence_audio = audio_output._create_silence_audio(100)
+    audio_output._write_audio_raw(silence_audio, is_keepalive=True)
+
+    # No callbacks should be recorded
+    assert len(callback_states) == 0
+
+    # Test regular audio (should trigger callbacks)
+    regular_audio = base64.b64encode(b"regular_audio").decode("utf-8")
+    audio_output._write_audio_raw(regular_audio, is_keepalive=False)
+
+    # Should have start and end callbacks
+    assert len(callback_states) == 2
+    assert callback_states[0] is True  # Start callback
+    assert callback_states[1] is False  # End callback
+
+    audio_output.stop()
