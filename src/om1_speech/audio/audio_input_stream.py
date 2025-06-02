@@ -42,6 +42,8 @@ class AudioInputStream:
         A callback function that receives audio data chunks (default: None)
     language_code: str, optional
         The language for the ASR to listen. (default: en-US)
+    remote_input : bool, optional
+        If True, indicates that the audio input is from a remote source.
     """
 
     def __init__(
@@ -53,6 +55,7 @@ class AudioInputStream:
         audio_data_callback: Optional[Callable] = None,
         audio_data_callbacks: Optional[List[Callable]] = None,
         language_code: Optional[str] = None,
+        remote_input: bool = False,
     ):
         self._rate = rate
         self._chunk = chunk
@@ -88,6 +91,10 @@ class AudioInputStream:
         self._lock = threading.Lock()
 
         self.running: bool = True
+
+        if remote_input:
+            logger.info("Remote input is enabled, skipping audio input initialization")
+            return
 
         if self._device is not None and self._device_name is not None:
             raise ValueError("Only one of device or device_name can be specified")
@@ -280,6 +287,28 @@ class AudioInputStream:
             if not self._is_tts_active:
                 self._buff.put(in_data)
         return None, pyaudio.paContinue
+
+    def _fill_buffer_remote(self, in_data: bytes, rate: int, language_code: str):
+        """
+        Callback function for remote audio data to fill the audio buffer.
+
+        This method is called when remote audio data is received. It adds the
+        data to the buffer queue if TTS is not active.
+
+        Parameters
+        ----------
+        in_data : bytes
+            The captured audio data
+        rate : int
+            The sampling rate of the audio data
+        language_code : str
+            The language code for the audio data
+        """
+        with self._lock:
+            if not self._is_tts_active:
+                self._buff.put(in_data)
+                self._rate = rate
+                self._language_code = language_code
 
     def generator(self) -> Generator[Dict[str, Union[bytes, int]], None, None]:
         """
