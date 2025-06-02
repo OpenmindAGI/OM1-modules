@@ -302,7 +302,12 @@ class AudioInputStream:
         ----------
         data : str
         """
-        audio_data = json.loads(data)
+        try:
+            audio_data = json.loads(data)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON data: {e}")
+            return
+
         if "audio" not in audio_data:
             logger.error("Received remote audio data without 'audio' key")
             return
