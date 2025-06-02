@@ -288,7 +288,7 @@ class AudioInputStream:
                 self._buff.put(in_data)
         return None, pyaudio.paContinue
 
-    def _fill_buffer_remote(self, in_data: bytes, rate: int, language_code: str):
+    def fill_buffer_remote(self, data: str):
         """
         Callback function for remote audio data to fill the audio buffer.
 
@@ -297,13 +297,17 @@ class AudioInputStream:
 
         Parameters
         ----------
-        in_data : bytes
-            The captured audio data
-        rate : int
-            The sampling rate of the audio data
-        language_code : str
-            The language code for the audio data
+        data : str
         """
+        audio_data = json.loads(data)
+        if "audio" not in audio_data:
+            logger.error("Received remote audio data without 'audio' key")
+            return
+
+        in_data = base64.b64decode(audio_data["audio"])
+        rate = audio_data.get("rate", self._rate)
+        language_code = audio_data.get("language_code", self._language_code)
+
         with self._lock:
             if not self._is_tts_active:
                 self._buff.put(in_data)
