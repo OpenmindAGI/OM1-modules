@@ -92,7 +92,8 @@ class AudioInputStream:
 
         self.running: bool = True
 
-        if remote_input:
+        self.remote_input = remote_input
+        if self.remote_input:
             logger.info("Remote input is enabled, skipping audio input initialization")
             return
 
@@ -225,15 +226,17 @@ class AudioInputStream:
             return self
 
         try:
-            self._audio_stream = self._audio_interface.open(
-                format=pyaudio.paInt16,
-                input_device_index=self._device,
-                channels=1,
-                rate=self._rate,
-                input=True,
-                frames_per_buffer=self._chunk,
-                stream_callback=self._fill_buffer,
-            )
+            if not self.remote_input:
+                logger.info("Remote input is disabled, initializing audio input stream")
+                self._audio_stream = self._audio_interface.open(
+                    format=pyaudio.paInt16,
+                    input_device_index=self._device,
+                    channels=1,
+                    rate=self._rate,
+                    input=True,
+                    frames_per_buffer=self._chunk,
+                    stream_callback=self._fill_buffer,
+                )
 
             # Start the audio processing thread
             self._start_audio_thread()
