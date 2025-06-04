@@ -9,7 +9,6 @@ import time
 from queue import Empty, Queue
 from typing import Callable, Dict, Optional
 
-import pyaudio
 import requests
 
 root_package_name = __name__.split(".")[0] if "." in __name__ else __name__
@@ -26,12 +25,6 @@ class AudioOutputStream:
         The URL endpoint for the text-to-speech service
     rate : int, optional
         The sampling rate in Hz for audio output (default: 8000)
-    device : int, optional
-        The output device index. If None, uses the first available output device
-        (default: None)
-    device_name: str, optional
-        The output device name. If None, uses the first available output device
-        (default: None)
     tts_state_callback : Optional[Callable], optional
         A callback function to receive TTS state changes (active/inactive)
         (default: None)
@@ -43,15 +36,11 @@ class AudioOutputStream:
         self,
         url: str,
         rate: int = 8000,
-        device: int = None,
-        device_name: str = None,
         tts_state_callback: Optional[Callable] = None,
         headers: Optional[Dict[str, str]] = None,
     ):
         self._url = url
         self._rate = rate
-        self._device = device
-        self._device_name = device_name
 
         # Process headers
         self._headers = headers or {}
@@ -64,64 +53,13 @@ class AudioOutputStream:
         # Pending requests queue
         self._pending_requests: Queue[Optional[str]] = Queue()
 
-        # Initialize audio interface
-        self._pyaudio_interface = pyaudio.PyAudio()
+        # Slience audio for Bluetooth optimization
+        self._silence_audio = self._create_silence_audio(100)
+        self._silence_prefix = self._create_silence_audio(500)
 
+        # Running state and last audio time
         self.running: bool = True
         self._last_audio_time = time.time()
-
-        if self._device is not None and self._device_name is not None:
-            logger.error("Only one of device or device_name can be specified")
-            raise ValueError("Only one of device or device_name can be specified")
-
-        # Find a suitable output device
-        self._device = self._select_output_device()
-
-    def _select_output_device(self) -> int:
-        """
-        Select and validate audio output device.
-        """
-        device_count = self._pyaudio_interface.get_device_count()
-        logger.info(f"Found {device_count} audio devices")
-
-        if self._device is not None:
-            device_info = self._pyaudio_interface.get_device_info_by_index(self._device)
-            if device_info["maxOutputChannels"] == 0:
-                raise ValueError("Selected output device has no output channels")
-            logger.info(
-                f"Selected output device: {device_info['name']} ({self._device})"
-            )
-            return self._device
-
-        if self._device_name is not None:
-            available_devices = []
-            for i in range(device_count):
-                device_info = self._pyaudio_interface.get_device_info_by_index(i)
-                if device_info["maxOutputChannels"] > 0:
-                    device_name = device_info["name"]
-                    available_devices.append({"name": device_name, "index": i})
-                    if self._device_name.lower() in device_name.lower():
-                        logger.info(f"Found device by name: {device_name} ({i})")
-                        return i
-            raise ValueError(
-                f"No output device found with name {self._device_name}. Available devices: {available_devices}"
-            )
-
-        default_device_index = self._pyaudio_interface.get_default_output_device_info()[
-            "index"
-        ]
-        device_info = self._pyaudio_interface.get_device_info_by_index(
-            default_device_index
-        )
-        if device_info["maxOutputChannels"] == 0:
-            raise ValueError(
-                f"Default output device {device_info['name']} has no output channels"
-            )
-
-        logger.info(
-            f"Using default output device: {device_info['name']} ({default_device_index})"
-        )
-        return default_device_index
 
     def set_tts_state_callback(self, callback: Callable):
         """
@@ -173,6 +111,7 @@ class AudioOutputStream:
                         f"TTS request failed with status code {response.status_code}: {response.text}. Request details: {tts_request}"
                     )
             except Empty:
+                time.sleep(0.2)
                 continue
             except Exception as e:
                 logger.error(f"Error processing audio: {e}")
@@ -196,13 +135,6 @@ class AudioOutputStream:
         silence_bytes = b"\x00" * (samples * 2)
         return base64.b64encode(silence_bytes)
 
-    def _play_keepalive_sound(self):
-        """
-        Play a very brief silent audio to keep Bluetooth speakers awake.
-        """
-        silence_audio = self._create_silence_audio(100)
-        self._write_audio_raw(silence_audio, is_keepalive=True)
-
     def _keepalive_worker(self):
         """
         Background thread to play keepalive sounds every 60 seconds.
@@ -210,7 +142,7 @@ class AudioOutputStream:
         while self.running:
             current_time = time.time()
             if current_time - self._last_audio_time >= 60:
-                self._play_keepalive_sound()
+                self._write_audio_bytes(self._silence_audio, is_keepalive=True)
                 self._last_audio_time = current_time
             time.sleep(10)
 
@@ -228,11 +160,11 @@ class AudioOutputStream:
         silence_prefix = self._create_silence_audio(500)
         audio_bytes = base64.b64decode(silence_prefix) + base64.b64decode(audio_data)
 
-        self._write_audio_raw(base64.b64encode(audio_bytes))
+        self._write_audio_bytes(base64.b64encode(audio_bytes))
 
-    def _write_audio_raw(self, audio_data: bytes, is_keepalive: bool = False):
+    def _write_audio_bytes(self, audio_data: bytes, is_keepalive: bool = False):
         """
-        Write raw audio data to the output stream.
+        Write audio data to the output stream using ffplay.
 
         Parameters
         ----------
