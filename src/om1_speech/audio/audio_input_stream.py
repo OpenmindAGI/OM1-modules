@@ -42,6 +42,8 @@ class AudioInputStream:
         A callback function that receives audio data chunks (default: None)
     language_code: str, optional
         The language for the ASR to listen. (default: en-US)
+    remote_input : bool, optional
+        If True, indicates that the audio input is from a remote source.
     """
 
     def __init__(
@@ -53,6 +55,7 @@ class AudioInputStream:
         audio_data_callback: Optional[Callable] = None,
         audio_data_callbacks: Optional[List[Callable]] = None,
         language_code: Optional[str] = None,
+        remote_input: bool = False,
     ):
         self._rate = rate
         self._chunk = chunk
@@ -88,6 +91,11 @@ class AudioInputStream:
         self._lock = threading.Lock()
 
         self.running: bool = True
+
+        self.remote_input = remote_input
+        if self.remote_input:
+            logger.info("Remote input is enabled, skipping audio input initialization")
+            return
 
         if self._device is not None and self._device_name is not None:
             raise ValueError("Only one of device or device_name can be specified")
@@ -218,15 +226,17 @@ class AudioInputStream:
             return self
 
         try:
-            self._audio_stream = self._audio_interface.open(
-                format=pyaudio.paInt16,
-                input_device_index=self._device,
-                channels=1,
-                rate=self._rate,
-                input=True,
-                frames_per_buffer=self._chunk,
-                stream_callback=self._fill_buffer,
-            )
+            if not self.remote_input:
+                logger.info("Remote input is disabled, initializing audio input stream")
+                self._audio_stream = self._audio_interface.open(
+                    format=pyaudio.paInt16,
+                    input_device_index=self._device,
+                    channels=1,
+                    rate=self._rate,
+                    input=True,
+                    frames_per_buffer=self._chunk,
+                    stream_callback=self._fill_buffer,
+                )
 
             # Start the audio processing thread
             self._start_audio_thread()
@@ -280,6 +290,37 @@ class AudioInputStream:
             if not self._is_tts_active:
                 self._buff.put(in_data)
         return None, pyaudio.paContinue
+
+    def fill_buffer_remote(self, data: str):
+        """
+        Callback function for remote audio data to fill the audio buffer.
+
+        This method is called when remote audio data is received. It adds the
+        data to the buffer queue if TTS is not active.
+
+        Parameters
+        ----------
+        data : str
+        """
+        try:
+            audio_data = json.loads(data)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON data: {e}")
+            return
+
+        if "audio" not in audio_data:
+            logger.error("Received remote audio data without 'audio' key")
+            return
+
+        in_data = base64.b64decode(audio_data["audio"])
+        rate = audio_data.get("rate", self._rate)
+        language_code = audio_data.get("language_code", self._language_code)
+
+        with self._lock:
+            if not self._is_tts_active:
+                self._buff.put(in_data)
+                self._rate = rate
+                self._language_code = language_code
 
     def generator(self) -> Generator[Dict[str, Union[bytes, int]], None, None]:
         """
