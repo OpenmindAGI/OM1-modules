@@ -157,8 +157,7 @@ class AudioOutputStream:
         """
         self._last_audio_time = time.time()
 
-        silence_prefix = self._create_silence_audio(500)
-        audio_bytes = base64.b64decode(silence_prefix) + base64.b64decode(audio_data)
+        audio_bytes = self._silence_prefix + base64.b64decode(audio_data)
 
         self._write_audio_bytes(base64.b64encode(audio_bytes))
 
