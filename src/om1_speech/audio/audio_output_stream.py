@@ -279,10 +279,6 @@ def main():
     parser.add_argument(
         "--tts-url", type=str, required=True, help="URL for the TTS service"
     )
-    parser.add_argument("--device", type=int, default=None, help="Output device index")
-    parser.add_argument(
-        "--rate", type=int, default=8000, help="Audio output rate in Hz"
-    )
     args = parser.parse_args()
 
     audio_output = AudioOutputStream(args.tts_url, device=args.device, rate=args.rate)
