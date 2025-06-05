@@ -78,7 +78,9 @@ class AudioOutputStream:
         self._device = self._select_output_device()
 
     def _select_output_device(self) -> int:
-        """Select and validate audio output device."""
+        """
+        Select and validate audio output device.
+        """
         device_count = self._pyaudio_interface.get_device_count()
         logger.info(f"Found {device_count} audio devices")
 
@@ -195,12 +197,16 @@ class AudioOutputStream:
         return base64.b64encode(silence_bytes)
 
     def _play_keepalive_sound(self):
-        """Play a very brief silent audio to keep Bluetooth speakers awake."""
+        """
+        Play a very brief silent audio to keep Bluetooth speakers awake.
+        """
         silence_audio = self._create_silence_audio(100)
         self._write_audio_raw(silence_audio, is_keepalive=True)
 
     def _keepalive_worker(self):
-        """Background thread to play keepalive sounds every 60 seconds."""
+        """
+        Background thread to play keepalive sounds every 60 seconds.
+        """
         while self.running:
             current_time = time.time()
             if current_time - self._last_audio_time >= 60:
