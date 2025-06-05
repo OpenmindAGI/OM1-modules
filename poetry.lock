@@ -598,10 +598,10 @@ test = ["numpy"]
 name = "pyrealsense2"
 version = "2.55.1.6486"
 description = "Python Wrapper for Intel Realsense SDK 2.0."
-optional = false
+optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "platform_system == \"Linux\" and platform_machine == \"aarch64\" and sys_platform != \"darwin\""
+markers = "platform_system == \"Linux\" and platform_machine == \"aarch64\" and sys_platform == \"win32\" and extra == \"realsense\""
 files = [
     {file = "pyrealsense2-2.55.1.6486-cp310-cp310-manylinux1_x86_64.whl", hash = "sha256:882613808289c602b23f2e19bf1fbadd63fb3af9be9c2997cc4ea74741a65136"},
     {file = "pyrealsense2-2.55.1.6486-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:686320811ef30c162c7240cb619e9b152420c0a32337a137139276c87f213336"},
@@ -623,10 +623,10 @@ files = [
 name = "pyrealsense2-macosx"
 version = "2.54.2"
 description = "Python Wrapper for Intel Realsense SDK 2.0."
-optional = false
+optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "platform_system == \"Linux\" and platform_machine == \"aarch64\" and sys_platform == \"darwin\""
+markers = "platform_system == \"Linux\" and platform_machine == \"aarch64\" and sys_platform == \"darwin\" and extra == \"realsense\""
 files = [
     {file = "pyrealsense2_macosx-2.54.2-cp310-cp310-macosx_12_0_universal2.whl", hash = "sha256:464589886fe3d7763938f0b7f880cfa2214f9b14b05b3f6a4d3d27a65d0f044c"},
     {file = "pyrealsense2_macosx-2.54.2-cp311-cp311-macosx_12_0_universal2.whl", hash = "sha256:41ddb2aa368b2f089a1d89418841e5cc77aa0babd0549a77f1977512ce7846c3"},
@@ -1001,7 +1001,10 @@ files = [
     {file = "websockets-13.1.tar.gz", hash = "sha256:a3b3366087c1bc0a2795111edcadddb8b3b59509d5db5d7ea3fdd69f954a8878"},
 ]
 
+[extras]
+realsense = ["pyrealsense2", "pyrealsense2-macosx"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9"
-content-hash = "b855fa30107c83f8469b3a5316e85c00cae75e801784f9f1a3e945dbebda69d7"
+content-hash = "fb08aaaf1535abf62d8130f307417b346ac4457e337228e645a6b7ff3b07b46e"
