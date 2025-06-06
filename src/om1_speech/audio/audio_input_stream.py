@@ -336,7 +336,7 @@ class AudioInputStream:
             Combined audio data chunks
         """
         while self.running:
-            chunk = self._buff.get(timeout=0.1)
+            chunk = self._buff.get()
             if chunk is None:
                 return
 
@@ -348,7 +348,7 @@ class AudioInputStream:
             data = [chunk]
             while True:
                 try:
-                    chunk = self._buff.get(block=False, timeout=0.1)
+                    chunk = self._buff.get(block=False)
                     if chunk is None:
                         assert self.running
                     if chunk:
