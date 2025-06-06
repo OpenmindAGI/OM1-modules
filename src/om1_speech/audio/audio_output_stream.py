@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import threading
 import time
-from queue import Empty, Queue
+from queue import Queue
 from typing import Callable, Dict, Optional
 
 import requests
@@ -92,7 +92,7 @@ class AudioOutputStream:
         """
         while self.running:
             try:
-                tts_request = self._pending_requests.get_nowait()
+                tts_request = self._pending_requests.get()
                 response = requests.post(
                     self._url,
                     data=json.dumps(tts_request),
@@ -110,9 +110,6 @@ class AudioOutputStream:
                     logger.error(
                         f"TTS request failed with status code {response.status_code}: {response.text}. Request details: {tts_request}"
                     )
-            except Empty:
-                time.sleep(0.2)
-                continue
             except Exception as e:
                 logger.error(f"Error processing audio: {e}")
                 continue
