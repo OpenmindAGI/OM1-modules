@@ -45,9 +45,7 @@ class VideoStreamInput:
         try:
             frame_data = json.loads(message)
 
-            frame_base64 = frame_data.get(
-                "frame", message
-            )
+            frame_base64 = frame_data.get("frame", message)
 
             img_bytes = base64.b64decode(frame_base64)
 
