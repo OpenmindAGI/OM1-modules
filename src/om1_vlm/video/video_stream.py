@@ -143,7 +143,6 @@ class VideoStream:
                     _, buffer = cv2.imencode(".jpg", frame, self.encode_quality)
                     frame_base64 = base64.b64encode(buffer).decode("utf-8")
 
-                    # Create frame data with timestamp
                     frame_data = json.dumps(
                         {"timestamp": time.time(), "frame": frame_base64}
                     )

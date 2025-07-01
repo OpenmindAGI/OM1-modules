@@ -58,16 +58,12 @@ class VideoStreamInput:
             If frame processing fails at any stage
         """
         try:
-            # Parse JSON message
             try:
                 frame_data = json.loads(message)
                 frame_base64 = frame_data.get("frame", message)
-                # timestamp = frame_data.get("timestamp", None)  # Available for future use
             except json.JSONDecodeError:
-                # Fallback for non-JSON messages (backward compatibility)
                 frame_base64 = message
 
-            # Decode base64 image
             img_bytes = base64.b64decode(frame_base64)
             img_np = np.frombuffer(img_bytes, dtype=np.uint8)
             frame = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
