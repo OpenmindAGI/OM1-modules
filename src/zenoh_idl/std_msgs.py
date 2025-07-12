@@ -37,9 +37,17 @@ class String(IdlStruct, typename="String"):
     data: str
 
 
-def prepare_header(self) -> Header:
+def prepare_header(frame_id: str = "") -> Header:
+    """
+    Prepare a Header with the current timestamp and a given frame ID.
+
+    Parameters:
+    ----------
+    frame_id : str
+        The frame ID to be set in the header.
+    """
     ts = time.time()
     remainder, seconds = math.modf(ts)
     timestamp = Time(sec=int32(seconds), nanosec=uint32(remainder * 1000000000))
-    header = Header(stamp=timestamp, frame_id=str(self.sentence_counter))
+    header = Header(stamp=timestamp, frame_id=frame_id)
     return header

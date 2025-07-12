@@ -214,7 +214,7 @@ class AudioOutputStream:
 
             new_state = self.audio_status
             new_state.header = prepare_header()
-            new_state.status_speaker = AudioStatus.STATUS_SPEAKER.ACTIVE
+            new_state.status_speaker = AudioStatus.STATUS_SPEAKER.ACTIVE.value
 
             if self.pub:
                 self.pub.put(new_state.serialize())
@@ -246,7 +246,7 @@ class AudioOutputStream:
 
             new_state = self.audio_status
             new_state.header = prepare_header()
-            new_state.status_speaker = AudioStatus.STATUS_SPEAKER.READY
+            new_state.status_speaker = AudioStatus.STATUS_SPEAKER.READY.value
 
             if self.pub:
                 self.pub.put(new_state.serialize())

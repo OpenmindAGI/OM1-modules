@@ -200,24 +200,33 @@ class AudioInputStream:
 
         if self.audio_status.status_mic == AudioStatus.STATUS_SPEAKER.ENABLED:
             with self._lock:
-                self._is_tts_active = True
-                logger.info("Audio input enabled, resuming audio capture")
+                if not self._is_tts_active:
+                    new_state = self.audio_status
+                    new_state.header = prepare_header()
+                    new_state.status_mic = (
+                        AudioStatus.STATUS_MIC.READY.value
+                        if self._is_tts_active
+                        else AudioStatus.STATUS_MIC.DISABLED.value
+                    )
+
+                    if self.pub:
+                        self.pub.put(new_state.serialize())
+
+                    self._is_tts_active = True
+                    logger.info("Audio input enabled, resuming audio capture")
 
         if self.audio_status.status_speaker == AudioStatus.STATUS_SPEAKER.DISABLED:
             with self._lock:
-                self._is_tts_active = False
-                logger.info("Audio input disabled, suspending audio capture")
+                if self._is_tts_active:
+                    new_state = self.audio_status
+                    new_state.header = prepare_header()
+                    new_state.status_speaker = AudioStatus.STATUS_SPEAKER.READY.value
 
-        new_state = self.audio_status
-        new_state.header = prepare_header()
-        new_state.status_mic = (
-            AudioStatus.STATUS_MIC.READY
-            if self._is_tts_active
-            else AudioStatus.STATUS_MIC.DISABLED
-        )
+                    if self.pub:
+                        self.pub.put(new_state.serialize())
 
-        if self.pub:
-            self.pub.put(new_state.serialize())
+                    self._is_tts_active = False
+                    logger.info("Audio input disabled, suspending audio capture")
 
     def on_tts_state_change(self, is_active: bool):
         """
