@@ -11,7 +11,8 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 import pyaudio
 import zenoh
 
-from zenoh_idl.status_msgs import AudioStatus, prepare_header
+from zenoh_idl.status_msgs import AudioStatus
+from zenoh_idl.std_msgs import prepare_header
 
 root_package_name = __name__.split(".")[0] if "." in __name__ else __name__
 logger = logging.getLogger(root_package_name)
@@ -102,7 +103,7 @@ class AudioInputStream:
         try:
             self.session = zenoh.open(zenoh.Config())
             self.pub = self.session.declare_publisher(self.topic)
-            self.session.declare_subscriber(self.topic, self.fill_buffer_remote)
+            self.session.declare_subscriber(self.topic, self.audio_message)
         except Exception as e:
             logger.error(f"Failed to declare Zenoh subscriber: {e}")
             self.session = None
