@@ -198,8 +198,11 @@ class AudioInputStream:
         self.audio_status = AudioStatus.deserialize(data.payload.to_bytes())
         logger.info(f"Received audio status: {self.audio_status}")
 
-        if self.audio_status.status_mic == AudioStatus.STATUS_SPEAKER.ACTIVE:
+        if self.audio_status.status_speaker == AudioStatus.STATUS_SPEAKER.ACTIVE.value:
             with self._lock:
+                print(
+                    "Audio input is active, resuming audio capture", self._is_tts_active
+                )
                 if not self._is_tts_active:
                     new_state = self.audio_status
                     new_state.header = prepare_header()
@@ -211,8 +214,12 @@ class AudioInputStream:
                     self._is_tts_active = True
                     logger.info("Audio input enabled, resuming audio capture")
 
-        if self.audio_status.status_speaker == AudioStatus.STATUS_SPEAKER.READY:
+        if self.audio_status.status_speaker == AudioStatus.STATUS_SPEAKER.READY.value:
             with self._lock:
+                print(
+                    "Audio input is ready, suspending audio capture",
+                    self._is_tts_active,
+                )
                 if self._is_tts_active:
                     new_state = self.audio_status
                     new_state.header = prepare_header()
