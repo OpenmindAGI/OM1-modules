@@ -12,11 +12,13 @@ class AudioStatus(IdlStruct, typename="AudioStatus"):
         DISABLED = 0
         READY = 1
         ACTIVE = 2
+        UNKOWN = 3
 
     class STATUS_SPEAKER(Enum):
         DISABLED = 0
         READY = 1
         ACTIVE = 2
+        UNKOWN = 3
 
     header: Header
     status_mic: int8
