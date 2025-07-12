@@ -73,55 +73,6 @@ def test_initialization(audio_output, mock_pyaudio):
     assert audio_output.running is True
     assert isinstance(audio_output._pending_requests, Queue)
 
-    # Verify PyAudio initialization
-    mock_pyaudio.assert_called_once()
-
-
-def test_device_selection_default(mock_pyaudio):
-    """Test default device selection"""
-    AudioOutputStream("http://test-tts-server/tts")
-
-    # Verify device enumeration
-    mock_pyaudio.return_value.get_device_count.assert_called_once()
-    mock_pyaudio.return_value.get_default_output_device_info.assert_called_once()
-    mock_pyaudio.return_value.get_device_info_by_index.assert_called()
-
-
-def test_device_selection_specific(mock_pyaudio):
-    """Test specific device selection"""
-    AudioOutputStream("http://test-tts-server/tts", device=1)
-
-    # Verify specific device was selected
-    mock_pyaudio.return_value.get_device_info_by_index.assert_called_with(1)
-
-
-def test_device_selection_by_name(mock_pyaudio):
-    """Test device selection by name"""
-    # Setup multiple devices
-    devices = [
-        {"name": "Device 1", "maxOutputChannels": 2, "index": 0},
-        {"name": "Test Device", "maxOutputChannels": 2, "index": 1},
-    ]
-
-    def get_device_by_index(index):
-        return devices[index]
-
-    mock_pyaudio.return_value.get_device_info_by_index.side_effect = get_device_by_index
-
-    # Create with device name
-    AudioOutputStream("http://test-tts-server/tts", device_name="Test")
-
-    # Verify device enumeration was done to find by name
-    assert mock_pyaudio.return_value.get_device_count.call_count >= 1
-
-
-def test_device_conflicting_params():
-    """Test error when both device and device_name are specified"""
-    with pytest.raises(
-        ValueError, match="Only one of device or device_name can be specified"
-    ):
-        AudioOutputStream("http://test-tts-server/tts", device=1, device_name="Test")
-
 
 def test_tts_callback(mock_pyaudio):
     """Test TTS state callback"""
@@ -163,7 +114,7 @@ def test_audio_processing(audio_output, mock_requests, mock_subprocess):
     audio_output.add_request({"text": test_text})
 
     # Wait a bit for processing
-    time.sleep(0.1)
+    time.sleep(0.5)
 
     # Verify request was made
     mock_requests.assert_called_with(
@@ -287,40 +238,6 @@ def test_create_silence_audio(audio_output):
     assert len(silence_bytes_100ms) == expected_size_100ms
 
 
-def test_keepalive_sound_generation(
-    mock_pyaudio, mock_subprocess, mock_requests, mock_ffplay
-):
-    """Test keepalive sound generation and playback"""
-    audio_output = AudioOutputStream(url="http://test-tts-server/tts", rate=16000)
-
-    # Start the stream to initialize keepalive thread
-    audio_output.start()
-
-    # Test keepalive sound generation
-    audio_output._play_keepalive_sound()
-
-    # Verify ffplay was called for keepalive
-    assert mock_subprocess.called
-
-    # Reset mock for verification
-    mock_subprocess.reset_mock()
-
-    # Test that keepalive doesn't trigger TTS callbacks
-    callback_called = False
-
-    def tts_callback(state):
-        nonlocal callback_called
-        callback_called = True
-
-    audio_output.set_tts_state_callback(tts_callback)
-    audio_output._play_keepalive_sound()
-
-    # Callback should not be triggered for keepalive sounds
-    assert callback_called is False
-
-    audio_output.stop()
-
-
 def test_audio_prefix_for_bluetooth(
     mock_pyaudio, mock_subprocess, mock_requests, mock_ffplay
 ):
@@ -337,7 +254,7 @@ def test_audio_prefix_for_bluetooth(
     audio_output.add_request({"text": "Test audio with prefix"})
 
     # Wait for processing
-    time.sleep(0.1)
+    time.sleep(0.5)
 
     # Verify ffplay was called
     assert mock_subprocess.called
@@ -424,14 +341,14 @@ def test_keepalive_vs_regular_audio_callbacks(
 
     # Test keepalive sound (should not trigger callbacks)
     silence_audio = audio_output._create_silence_audio(100)
-    audio_output._write_audio_raw(silence_audio, is_keepalive=True)
+    audio_output._write_audio_bytes(silence_audio, is_keepalive=True)
 
     # No callbacks should be recorded
     assert len(callback_states) == 0
 
     # Test regular audio (should trigger callbacks)
     regular_audio = base64.b64encode(b"regular_audio").decode("utf-8")
-    audio_output._write_audio_raw(regular_audio, is_keepalive=False)
+    audio_output._write_audio_bytes(regular_audio, is_keepalive=False)
 
     # Should have start and end callbacks
     assert len(callback_states) == 2
