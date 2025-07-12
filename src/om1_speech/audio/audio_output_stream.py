@@ -13,7 +13,7 @@ import requests
 import zenoh
 
 from zenoh_idl.status_msgs import AudioStatus
-from zenoh_idl.std_msgs import prepare_header
+from zenoh_idl.std_msgs import String, prepare_header
 
 root_package_name = __name__.split(".")[0] if "." in __name__ else __name__
 logger = logging.getLogger(root_package_name)
@@ -211,6 +211,15 @@ class AudioOutputStream:
 
         if not is_keepalive:
             self._tts_callback(True)
+
+            if self.audio_status is None:
+                self.audio_status = AudioStatus(
+                    header=prepare_header(),
+                    status_speaker=AudioStatus.STATUS_SPEAKER.ACTIVE.value,
+                    status_mic=AudioStatus.STATUS_MIC.UNKOWN.value,
+                    sentence_to_speak=String(""),
+                    sentence_counter=0,
+                )
 
             new_state = self.audio_status
             new_state.header = prepare_header()
