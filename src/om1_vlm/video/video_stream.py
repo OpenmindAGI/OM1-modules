@@ -5,7 +5,7 @@ import logging
 import platform
 import threading
 import time
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Tuple
 
 import cv2
 
@@ -26,23 +26,32 @@ class VideoStream:
     Parameters
     ----------
     frame_callback : Optional[Callable[[str], None]], optional
-        Callback function to handle processed frame data.
-        Function receives base64 encoded frame data.
-        By default None
+    frame_callbacks : Optional[List[Callable[[str], None]]], optional
+        List of callback functions to be called with base64 encoded frame data,
+        by default None
     fps : Optional[int], optional
         Frames per second to capture.
         By default 30
+    resolution : Optional[Tuple[int, int]], optional
+        Resolution of the captured video frames.
+        By default (640, 480)
+    jpeg_quality : int, optional
+        JPEG quality for encoding frames, by default 70
     """
 
     def __init__(
         self,
         frame_callback: Optional[Callable[[str], None]] = None,
+        frame_callbacks: Optional[List[Callable[[str], None]]] = None,
         fps: Optional[int] = 30,
+        resolution: Optional[Tuple[int, int]] = (640, 480),
+        jpeg_quality: int = 70,
     ):
         self._video_thread: Optional[threading.Thread] = None
 
-        # Callback for video frame data
-        self.frame_callback = frame_callback
+        # Callbacks for video frame data
+        self.frame_callbacks = frame_callbacks or []
+        self.register_frame_callback(frame_callback)
 
         # Video capture device
         self._cap = None
@@ -51,6 +60,11 @@ class VideoStream:
 
         self.fps = fps
         self.frame_delay = 1.0 / fps  # Calculate delay between frames
+        self.resolution = resolution
+        self.encode_quality = [
+            cv2.IMWRITE_JPEG_QUALITY,
+            jpeg_quality,
+        ]
 
         # Create a dedicated event loop for async tasks
         self.loop = asyncio.new_event_loop()
@@ -88,29 +102,58 @@ class VideoStream:
             logger.error(f"Error opening video stream from {camindex}")
             return
 
+        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
+        self._cap.set(cv2.CAP_PROP_FPS, self.fps)
+
+        actual_width = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        if actual_width != self.resolution[0] or actual_height != self.resolution[1]:
+            logger.warning(
+                f"Camera doesn't support resolution {self.resolution}. Using {(actual_width, actual_height)} instead."
+            )
+            self.resolution = (actual_width, actual_height)
+
+        try:
+            self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
+
+        try:
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        except Exception:
+            pass
+
+        frame_time = 1.0 / self.fps
+        last_frame_time = time.perf_counter()
+
         try:
             while self.running:
+                current_time = time.perf_counter()
+                elapsed = current_time - last_frame_time
+
                 ret, frame = self._cap.read()
                 if not ret:
                     logger.error("Error reading frame from video stream")
                     time.sleep(0.1)
                     continue
 
-                # Convert frame to base64
-                _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                frame_data = base64.b64encode(buffer).decode("utf-8")
+                if elapsed <= 1.5 * frame_time and self.frame_callbacks:
+                    _, buffer = cv2.imencode(".jpg", frame, self.encode_quality)
+                    frame_data = base64.b64encode(buffer).decode("utf-8")
 
-                if self.frame_callback:
-                    if inspect.iscoroutinefunction(self.frame_callback):
-                        asyncio.run_coroutine_threadsafe(
-                            self.frame_callback(frame_data), self.loop
-                        )
-                    else:
-                        self.frame_callback(frame_data)
+                    for frame_callback in self.frame_callbacks:
+                        if inspect.iscoroutinefunction(frame_callback):
+                            asyncio.run_coroutine_threadsafe(
+                                frame_callback(frame_data), self.loop
+                            )
+                        else:
+                            frame_callback(frame_data)
 
-                time.sleep(
-                    self.frame_delay
-                )  # Use calculated frame delay instead of hardcoded value
+                elapsed_time = time.perf_counter() - last_frame_time
+                if elapsed_time < frame_time:
+                    time.sleep(frame_time - elapsed_time)
+                last_frame_time = time.perf_counter()
 
         except Exception as e:
             logger.error(f"Error streaming video: {e}")
@@ -140,7 +183,17 @@ class VideoStream:
         frame_callback : Callable[[str], None]
             Function to be called with base64 encoded frame data
         """
-        self.frame_callback = frame_callback
+        if frame_callback is None:
+            logger.warning("Frame callback is None, not registering")
+            return
+
+        if frame_callback not in self.frame_callbacks:
+            self.frame_callbacks.append(frame_callback)
+            logger.info("Registered new frame callback")
+            return
+
+        logger.warning("Frame callback already registered")
+        return
 
     def start(self):
         """

@@ -27,6 +27,7 @@ class Client:
     def __init__(self, url: str = "ws://localhost:6789"):
         self.url = url
         self.running: bool = True
+        self.is_policy_violation: bool = False
         self.connected: bool = False
         self.websocket: Optional[websockets.WebSocketClientProtocol] = None
         self.message_callback: Optional[Callable] = None
@@ -48,7 +49,15 @@ class Client:
                 logger.debug(f"Received WS Message: {formatted_msg}")
                 if self.message_callback:
                     self.message_callback(message)
-            except websockets.ConnectionClosed:
+            except websockets.ConnectionClosed as e:
+                close_code = e.code
+                close_reason = e.reason
+                if close_code == 1008:
+                    self.is_policy_violation = True
+                    logger.error("\n\n")
+                    logger.error("----- Policy Violation -----")
+                    logger.error(f"Policy violation: {close_reason}")
+                    logger.error("----- Policy Violation -----\n\n")
                 logger.info("WebSocket connection closed")
                 self.connected = False
                 break
@@ -137,14 +146,14 @@ class Client:
         implementing automatic reconnection with a delay between attempts.
         """
         while self.running:
-            if not self.connected:
+            if not self.connected and not self.is_policy_violation:
                 if self.connect():
                     logger.info("Connection established")
                 else:
                     logger.info("Connection failed, retrying in 5 seconds")
                     threading.Event().wait(5)  # Wait 5 seconds before retrying
             else:
-                threading.Event().wait(0.1)
+                threading.Event().wait(1)
 
     def start(self):
         """

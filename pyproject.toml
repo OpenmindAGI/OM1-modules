@@ -20,6 +20,13 @@ numpy = "^2.0.2"
 websockets = "^13.0"
 opencv-python = "^4.5.0"
 requests = "^2.32.3"
+protobuf = "^5.29.3"
+google = "^3.0.0"
+pyrealsense2 = {version = "2.55.1.6486", markers = "sys_platform == 'win32'", optional = true}
+pyrealsense2-macosx = {version = "^2.54.2", markers = "sys_platform == 'darwin'", optional = true}
+
+[tool.poetry.extras]
+realsense = ["pyrealsense2", "pyrealsense2-macosx"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0"
@@ -36,15 +43,18 @@ build-backend = "poetry.core.masonry.api"
 [tool.black]
 line-length = 88
 include = '\.pyi?$'
+exclude = "(.venv)|(/src/om1_vlm/gz/msgs)"
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
 line_length = 88
+skip_glob = [".venv*", "/src/om1_vlm/gz/msgs"]
 
 [tool.ruff]
 line-length = 88
 indent-width = 4
+exclude = ["src/om1_vlm/gz/msgs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

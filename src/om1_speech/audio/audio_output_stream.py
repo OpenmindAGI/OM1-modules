@@ -2,11 +2,13 @@ import argparse
 import base64
 import json
 import logging
+import shutil
+import subprocess
 import threading
-from queue import Empty, Queue
+import time
+from queue import Queue
 from typing import Callable, Dict, Optional
 
-import pyaudio
 import requests
 
 root_package_name = __name__.split(".")[0] if "." in __name__ else __name__
@@ -23,12 +25,6 @@ class AudioOutputStream:
         The URL endpoint for the text-to-speech service
     rate : int, optional
         The sampling rate in Hz for audio output (default: 8000)
-    device : int, optional
-        The output device index. If None, uses the first available output device
-        (default: None)
-    device_name: str, optional
-        The output device name. If None, uses the first available output device
-        (default: None)
     tts_state_callback : Optional[Callable], optional
         A callback function to receive TTS state changes (active/inactive)
         (default: None)
@@ -40,15 +36,11 @@ class AudioOutputStream:
         self,
         url: str,
         rate: int = 8000,
-        device: int = None,
-        device_name: str = None,
         tts_state_callback: Optional[Callable] = None,
         headers: Optional[Dict[str, str]] = None,
     ):
         self._url = url
         self._rate = rate
-        self._device = device
-        self._device_name = device_name
 
         # Process headers
         self._headers = headers or {}
@@ -58,91 +50,16 @@ class AudioOutputStream:
         # Callback for TTS state
         self._tts_state_callback = tts_state_callback
 
-        # Audio interface
-        self.stream: Optional[pyaudio.Stream] = None
-
         # Pending requests queue
         self._pending_requests: Queue[Optional[str]] = Queue()
 
-        # Initialize audio interface
-        self._audio_interface = pyaudio.PyAudio()
+        # Slience audio for Bluetooth optimization
+        self._silence_audio = self._create_silence_audio(100)
+        self._silence_prefix = self._create_silence_audio(500)
 
+        # Running state and last audio time
         self.running: bool = True
-
-        if self._device is not None and self._device_name is not None:
-            logger.error("Only one of device or device_name can be specified")
-            raise ValueError("Only one of device or device_name can be specified")
-
-        # Find a suitable output device
-        try:
-            output_device = None
-            device_count = self._audio_interface.get_device_count()
-            logger.info(f"Found {device_count} audio devices")
-
-            if self._device is not None:
-                device_info = self._audio_interface.get_device_info_by_index(
-                    self._device
-                )
-                logger.info(
-                    f"Selected output device: {device_info['name']} ({self._device})"
-                )
-                if device_info["maxOutputChannels"] == 0:
-                    raise ValueError("Selected output device has no output channels")
-                else:
-                    output_device = device_info
-            elif self._device_name is not None:
-                available_devices = []
-                for i in range(device_count):
-                    device_info = self._audio_interface.get_device_info_by_index(i)
-                    if device_info["maxOutputChannels"] > 0:
-                        device_name = device_info["name"]
-                        available_devices.append({"name": device_name, "index": i})
-                        if self._device_name.lower() in device_name.lower():
-                            output_device = device_info
-                            self._device = i
-                            break
-                if output_device is None:
-                    raise ValueError(
-                        f"No output device found with name {self._device_name}. Available devices: {available_devices}"
-                    )
-            else:
-                for i in range(device_count):
-                    device_info = self._audio_interface.get_device_info_by_index(i)
-                    logger.info(f"Device {i}: {device_info['name']}")
-                    logger.info(
-                        f"Max Output Channels: {device_info['maxOutputChannels']}"
-                    )
-
-                    if device_info["maxOutputChannels"] > 0:
-                        output_device = device_info
-                        self._device = i
-                        break
-
-                if output_device is None:
-                    raise ValueError("No output device found")
-
-            logger.info(
-                f"Selected output device: {output_device['name']} at index {self._device}"
-            )
-
-            self.stream = self._audio_interface.open(
-                output_device_index=self._device,
-                format=pyaudio.paInt16,
-                channels=min(
-                    2, output_device["maxOutputChannels"]
-                ),  # Use up to 2 channels
-                rate=self._rate,
-                output=True,
-                frames_per_buffer=1024,
-            )
-            logger.info("Successfully opened audio stream")
-
-        except Exception as e:
-            logger.error(f"Error setting up audio: {e}")
-            if self.stream:
-                self.stream.close()
-            self.stream = None
-            raise
+        self._last_audio_time = time.time()
 
     def set_tts_state_callback(self, callback: Callable):
         """
@@ -175,7 +92,7 @@ class AudioOutputStream:
         """
         while self.running:
             try:
-                tts_request = self._pending_requests.get_nowait()
+                tts_request = self._pending_requests.get()
                 response = requests.post(
                     self._url,
                     data=json.dumps(tts_request),
@@ -185,7 +102,7 @@ class AudioOutputStream:
                 logger.info(f"Received TTS response: {response.status_code}")
                 if response.status_code == 200:
                     result = response.json()
-                    if "response" in result and self.stream:
+                    if "response" in result:
                         audio_data = result["response"]
                         self._write_audio(audio_data)
                         logger.debug(f"Processed TTS request: {tts_request}")
@@ -193,31 +110,103 @@ class AudioOutputStream:
                     logger.error(
                         f"TTS request failed with status code {response.status_code}: {response.text}. Request details: {tts_request}"
                     )
-            except Empty:
-                continue
             except Exception as e:
                 logger.error(f"Error processing audio: {e}")
                 continue
 
+    def _create_silence_audio(self, duration_ms: int = 500) -> bytes:
+        """
+        Create silent audio data.
+
+        Parameters
+        ----------
+        duration_ms : int
+            Duration of silence in milliseconds
+
+        Returns
+        -------
+        bytes
+            Base64 encoded silent audio data
+        """
+        samples = int(self._rate * duration_ms / 1000)
+        silence_bytes = b"\x00" * (samples * 2)
+        return base64.b64encode(silence_bytes)
+
+    def _keepalive_worker(self):
+        """
+        Background thread to play keepalive sounds every 60 seconds.
+        """
+        while self.running:
+            current_time = time.time()
+            if current_time - self._last_audio_time >= 60:
+                self._write_audio_bytes(self._silence_audio, is_keepalive=True)
+                self._last_audio_time = current_time
+            time.sleep(10)
+
     def _write_audio(self, audio_data: bytes):
         """
-        Write audio data to the output stream.
+        Write audio data to the output stream with Bluetooth optimization.
 
         Parameters
         ----------
         audio_data : bytes
             The audio data to be written to the output stream
         """
-        if self.stream:
-            audio_bytes = base64.b64decode(audio_data)
+        self._last_audio_time = time.time()
 
+        audio_bytes = self._silence_prefix + base64.b64decode(audio_data)
+
+        self._write_audio_bytes(base64.b64encode(audio_bytes))
+
+    def _write_audio_bytes(self, audio_data: bytes, is_keepalive: bool = False):
+        """
+        Write audio data to the output stream using ffplay.
+
+        Parameters
+        ----------
+        audio_data : bytes
+            The audio data to be written to the output stream
+        is_keepalive : bool
+            Whether this is a keepalive sound (suppresses callbacks)
+        """
+        audio_bytes = base64.b64decode(audio_data)
+
+        if not is_installed("ffplay"):
+            message = (
+                "ffplay from ffmpeg not found, necessary to play audio. "
+                "On mac you can install it with 'brew install ffmpeg'. "
+                "On linux and windows you can install it from https://ffmpeg.org/"
+            )
+            logger.error(message)
+            return
+
+        if not is_keepalive:
             self._tts_callback(True)
 
-            self.stream.write(audio_bytes)
+        args = [
+            "ffplay",
+            "-autoexit",
+            "-",
+            "-nodisp",
+            # It is not good at supporting audio_device_index from pyaudio
+            # Reading the list from ffplay doesn't work either
+            # "-audio_device_index",
+            # str(self._device),
+        ]
+        proc = subprocess.Popen(
+            args=args,
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        proc.communicate(input=audio_bytes)
+        exit_code = proc.poll()
 
-            self.stream.stop_stream()
+        if exit_code != 0 and not is_keepalive:
+            logger.error(f"Error playing audio: {exit_code}")
+
+        if not is_keepalive:
             self._tts_callback(False)
-            self.stream.start_stream()
 
     def _tts_callback(self, is_active: bool):
         """
@@ -240,6 +229,10 @@ class AudioOutputStream:
         process_thread = threading.Thread(target=self._process_audio)
         process_thread.daemon = True
         process_thread.start()
+
+        keepalive_thread = threading.Thread(target=self._keepalive_worker)
+        keepalive_thread.daemon = True
+        keepalive_thread.start()
 
     def run_interactive(self):
         """
@@ -269,6 +262,10 @@ class AudioOutputStream:
         self.running = False
 
 
+def is_installed(lib_name: str) -> bool:
+    return shutil.which(lib_name) is not None
+
+
 def main():
     """
     Main function for running the audio output stream.
@@ -278,10 +275,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--tts-url", type=str, required=True, help="URL for the TTS service"
-    )
-    parser.add_argument("--device", type=int, default=None, help="Output device index")
-    parser.add_argument(
-        "--rate", type=int, default=8000, help="Audio output rate in Hz"
     )
     args = parser.parse_args()
 

@@ -1,10 +1,12 @@
 # Description: Audio stream class for capturing audio from a microphone
 # A partial of code comes from https://github.com/nvidia-riva/python-clients/blob/main/riva/client/audio_io.py
 
+import base64
+import json
 import logging
 import queue
 import threading
-from typing import Any, Callable, Generator, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import pyaudio
 
@@ -24,9 +26,12 @@ class AudioInputStream:
     Parameters
     ----------
     rate : int, optional
-        The sampling rate in Hz for audio capture (default: 16000)
+        The sampling rate in Hz for audio capture. If None, uses the default rate of the selected device.
+        (default: None)
     chunk : int, optional
-        The size of each audio chunk in frames (default: 4048)
+        The size of each audio chunk in frames. If None, automatically calculates an optimal chunk size
+        based on the sample rate (approximately 100ms of audio).
+        (default: None)
     device : Optional[Union[str, int, float, Any]], optional
         The input device identifier. Can be device index or name. If None,
         uses system default input device (default: None)
@@ -35,23 +40,39 @@ class AudioInputStream:
         (default: None)
     audio_data_callback : Optional[Callable], optional
         A callback function that receives audio data chunks (default: None)
+    language_code: str, optional
+        The language for the ASR to listen. (default: en-US)
+    remote_input : bool, optional
+        If True, indicates that the audio input is from a remote source.
     """
 
     def __init__(
         self,
-        rate: int = 16000,
-        chunk: int = 4048,
+        rate: Optional[int] = None,
+        chunk: Optional[int] = None,
         device: Optional[Union[str, int, float, Any]] = None,
         device_name: str = None,
         audio_data_callback: Optional[Callable] = None,
+        audio_data_callbacks: Optional[List[Callable]] = None,
+        language_code: Optional[str] = None,
+        remote_input: bool = False,
     ):
         self._rate = rate
         self._chunk = chunk
         self._device = device
         self._device_name = device_name
 
+        # Determine language code
+        if language_code is None:
+            self._language_code = "en-US"
+            logger.info(f"Using default language code: {self._language_code}")
+        else:
+            self._language_code = language_code
+            logger.info(f"Using specified language code: {self._language_code}")
+
         # Callback for audio data
-        self.audio_data_callback = audio_data_callback
+        self._audio_data_callbacks = audio_data_callbacks or []
+        self.register_audio_data_callback(audio_data_callback)
 
         # Flag to indicate if TTS is active
         self._is_tts_active: bool = False
@@ -71,6 +92,11 @@ class AudioInputStream:
 
         self.running: bool = True
 
+        self.remote_input = remote_input
+        if self.remote_input:
+            logger.info("Remote input is enabled, skipping audio input initialization")
+            return
+
         if self._device is not None and self._device_name is not None:
             raise ValueError("Only one of device or device_name can be specified")
 
@@ -87,7 +113,9 @@ class AudioInputStream:
                     f"Selected input device: {input_device['name']} ({self._device})"
                 )
                 if input_device["maxInputChannels"] == 0:
-                    logger.warn(f"Selected input device does not advertize input channels: {input_device['name']} ({self._device})")
+                    logger.warning(
+                        f"Selected input device does not advertize input channels: {input_device['name']} ({self._device})"
+                    )
             elif self._device_name is not None:
                 available_devices = []
                 for i in range(device_count):
@@ -116,6 +144,25 @@ class AudioInputStream:
                 f"Selected input device: {input_device['name']} ({self._device})"
             )
 
+            if rate is None:
+                self._rate = int(input_device.get("defaultSampleRate", 16000))
+                logger.info(f"Using device default sample rate: {self._rate} Hz")
+            else:
+                self._rate = rate
+                logger.info(f"Using specified sample rate: {self._rate} Hz")
+
+            if chunk is None:
+                self._chunk = int(self._rate * 0.2)  # ~200ms of audio
+                logger.info(
+                    f"Using calculated chunk size: {self._chunk} frames (~200ms)"
+                )
+            else:
+                self._chunk = chunk
+                chunk_duration_ms = (self._chunk / self._rate) * 1000
+                logger.info(
+                    f"Using specified chunk size: {self._chunk} frames (~{chunk_duration_ms:.1f}ms)"
+                )
+
         except Exception as e:
             logger.error(f"Error initializing audio input: {e}")
             self._audio_interface.terminate()
@@ -136,6 +183,27 @@ class AudioInputStream:
         with self._lock:
             self._is_tts_active = is_active
             logger.info(f"TTS active state changed to: {is_active}")
+
+    def register_audio_data_callback(self, audio_callback: Callable):
+        """
+        Registers a callback function for audio data processing.
+
+        Parameters
+        ----------
+        callback : Callable
+            Function to be called with audio data chunks
+        """
+        if audio_callback is None:
+            logger.warning("Audio data callback is None, not registering")
+            return
+
+        if audio_callback not in self._audio_data_callbacks:
+            self._audio_data_callbacks.append(audio_callback)
+            logger.info("Registered new audio data callback")
+            return
+
+        logger.warning("Audio data callback already registered")
+        return
 
     def start(self) -> "AudioInputStream":
         """
@@ -158,15 +226,17 @@ class AudioInputStream:
             return self
 
         try:
-            self._audio_stream = self._audio_interface.open(
-                format=pyaudio.paInt16,
-                input_device_index=self._device,
-                channels=1,
-                rate=self._rate,
-                input=True,
-                frames_per_buffer=self._chunk,
-                stream_callback=self._fill_buffer,
-            )
+            if not self.remote_input:
+                logger.info("Remote input is disabled, initializing audio input stream")
+                self._audio_stream = self._audio_interface.open(
+                    format=pyaudio.paInt16,
+                    input_device_index=self._device,
+                    channels=1,
+                    rate=self._rate,
+                    input=True,
+                    frames_per_buffer=self._chunk,
+                    stream_callback=self._fill_buffer,
+                )
 
             # Start the audio processing thread
             self._start_audio_thread()
@@ -221,7 +291,38 @@ class AudioInputStream:
                 self._buff.put(in_data)
         return None, pyaudio.paContinue
 
-    def generator(self) -> Generator[bytes, None, None]:
+    def fill_buffer_remote(self, data: str):
+        """
+        Callback function for remote audio data to fill the audio buffer.
+
+        This method is called when remote audio data is received. It adds the
+        data to the buffer queue if TTS is not active.
+
+        Parameters
+        ----------
+        data : str
+        """
+        try:
+            audio_data = json.loads(data)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON data: {e}")
+            return
+
+        if "audio" not in audio_data:
+            logger.error("Received remote audio data without 'audio' key")
+            return
+
+        in_data = base64.b64decode(audio_data["audio"])
+        rate = audio_data.get("rate", self._rate)
+        language_code = audio_data.get("language_code", self._language_code)
+
+        with self._lock:
+            if not self._is_tts_active:
+                self._buff.put(in_data)
+                self._rate = rate
+                self._language_code = language_code
+
+    def generator(self) -> Generator[Dict[str, Union[bytes, int]], None, None]:
         """
         Generates a stream of audio data chunks.
 
@@ -255,10 +356,15 @@ class AudioInputStream:
                 except queue.Empty:
                     break
 
-            if self.audio_data_callback:
-                self.audio_data_callback(b"".join(data))
+            response = {
+                "audio": base64.b64encode(b"".join(data)).decode("utf-8"),
+                "rate": self._rate,
+                "language_code": self._language_code,
+            }
+            for audio_callback in self._audio_data_callbacks:
+                audio_callback(json.dumps(response))
 
-            yield b"".join(data)
+            yield response
 
     def on_audio(self):
         """Audio processing loop"""

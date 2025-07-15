@@ -14,6 +14,11 @@ class MockVideoCapture:
         self.frame_count = 0
         self.release_called = False
         self._mock_stream = None
+        self._properties = {
+            3: 640,
+            4: 480,
+            5: 30,
+        }
 
     def isOpened(self):
         is_open = self.is_opened
@@ -35,6 +40,12 @@ class MockVideoCapture:
     def release(self):
         self.is_opened = False
         self.release_called = True
+
+    def set(self, prop_id, value):
+        self._properties[prop_id] = value
+
+    def get(self, prop_id):
+        return self._properties.get(prop_id, 100)
 
 
 @pytest.fixture
@@ -110,7 +121,8 @@ def mock_enumerate_devices():
 def test_video_stream_initialization():
     callback = Mock()
     stream = VideoStream(frame_callback=callback)
-    assert stream.frame_callback == callback
+    assert len(stream.frame_callbacks) == 1
+    assert stream.frame_callbacks[0] == callback
     assert stream.running
     assert stream._video_thread is None
 
@@ -247,7 +259,19 @@ def test_register_frame_callback():
     stream = VideoStream()
     callback = Mock()
     stream.register_frame_callback(callback)
-    assert stream.frame_callback == callback
+    assert len(stream.frame_callbacks) == 1
+    assert stream.frame_callbacks[0] == callback
+
+
+def test_register_multiple_frame_callbacks():
+    stream = VideoStream()
+    callback1 = Mock()
+    callback2 = Mock()
+    stream.register_frame_callback(callback1)
+    stream.register_frame_callback(callback2)
+    assert len(stream.frame_callbacks) == 2
+    assert stream.frame_callbacks[0] == callback1
+    assert stream.frame_callbacks[1] == callback2
 
 
 @pytest.mark.usefixtures("mock_cv2", "mock_platform", "mock_enumerate_devices")
